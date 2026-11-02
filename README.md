@@ -6,6 +6,8 @@ Designed for personal and home libraries supporting multilingual cataloging (**E
 Github works as a host website only, ALL THE DATAS AS ARE SECURE AND STORED IN THE PERSONAL GOOGLE ACCOUNT ECOSYSTEM ONLY (Sheets, Appscript, Drive)
 Made purely with the help of Gemini AI - 4 Argon (High)
 
+https://skd414.github.io/home-library/index.html
+
 ---
 
 ## ✨ Key Features
