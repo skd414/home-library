@@ -1,119 +1,75 @@
-# 📚 SKD Home Library & Digital Archive Management System
-(made with Gemini 4 Argon High)
-A full-featured, zero-cost **Home Library & Digital Preservation Archive Management System** built with **Google Sheets**, **Google Drive**, **Google Apps Script**, and an installable **Progressive Web App (PWA)** frontend hosted on **GitHub Pages**.
+# 📚 Home Library & Digital Archive Management System (LMS)
 
-Designed for personal, family, and community libraries, it supports **copy-level physical tracking**, **5-server ISBN barcode auto-fetching**, **Google Lens multilingual blurb extraction** (Malayalam, Arabic, English, Hindi), **hybrid Call Number generation**, **Google Drive PDF archive reading**, **1-tap WhatsApp reminders (`wa.me`)**, and **printable Spine + QR code sticker sheets**.
+A lightweight, serverless **Home Library & Digital Archive Management System** powered by **Google Sheets**, **Google Drive**, **Google Apps Script**, and a responsive **Flat Design Progressive Web App (PWA)**. 
+
+Designed for personal and home libraries supporting multilingual cataloging (**English, Malayalam, Arabic, Hindi**), camera barcode/QR scanning, interactive 4-point book cover perspective cropping, physical copy tracking, custom WhatsApp reminders (`wa.me`), and an embedded Google Drive PDF Archive reader.
 
 ---
 
 ## ✨ Key Features
 
-### 1. 📖 Catalog & Copy-Level Inventory
-* **Title vs. Physical Copy Separation:** Store master book metadata once (`1_Catalog`) while tracking multiple physical copies (`2_Copies`) with unique barcodes (`LIB-001001`, `LIB-001002`), individual shelf locations (`Room > Shelf > Row`), conditions, and lending statuses.
-* **Duplicate Detection:** Automatically alerts you if an ISBN or title already exists in your catalog and offers to add a duplicate physical copy instead.
-* **Multilingual Support:** Full Unicode search and display support for English, Malayalam (`മലയാളം`), Arabic (`العربية`), Hindi (`हिन्दी`), and transliterated titles.
-* **Public vs. Librarian Mode:** Public visitors can browse the catalog and public digital archive in read-only mode (with purchase prices and admin tools hidden). Entering your **Librarian Admin PIN** unlocks full management tabs.
+### 1. 24-Field Multilingual Catalog & Copy-Level Inventory
+* **Dual Titles:** Store both the English/Transliterated title and the Original Script title (e.g., മലയാളം, العربية, हिन्दी).
+* **24 Metadata Fields:** Book ID, English Title, Original Title, Book Type (Normal / Series / Volume), Series Name, Volume Number, Author(s), Publisher, ISBN, Edition, Language, Category/Genre, Publication Year, Pages, Format, Shelf Location, Date Acquired, Purchase Price, Reading Status, Book Condition, Star Rating, Notes/Remarks, Blurb, Front Cover, and Back Cover.
+* **Copy-Level Tracking:** Separates master book metadata (`1_Catalog`) from physical copies (`2_Copies`), assigning each physical book a unique **Accession Number** (`LIB-01001`) and **Call Number**.
+* **Smart Auto-Suggest & Categorization:** Automatically builds dropdown suggestions for previously entered Authors and Publishers. Click any Author, Publisher, or Category tag to filter the catalog.
+* **Interactive DDC Guide:** Built-in Dewey Decimal Classification (DDC) quick-reference chart for manual or automated call numbers.
 
-### 2. 🔍 Smart "Add Book" Workflow (5-Server ISBN + Google Lens)
-* **Camera Barcode Scanner:** Uses your phone or laptop camera (`html5-qrcode`) to scan ISBN barcodes and query **5 free book servers simultaneously**:
-  1. Google Books Volumes API
-  2. Open Library Data API (`jscmd=data`)
-  3. Open Library Edition & Works Server (for full descriptions/blurbs)
-  4. Open Library Search Index (for Dewey Decimal classifications & subjects)
-  5. Internet Archive Metadata Server
-* **Client-Side Image Compression & Drive Storage:** Automatically compresses Front Cover and Back Cover/Blurb photos in the browser (`~150 KB`) and stores them in your `/LMS_Covers` Google Drive folder.
-* **1-Click Google Lens Integration:** Generates a direct `lens.google.com` link for your uploaded cover/blurb photos so you can extract Malayalam, Arabic, or English text via Google Lens and paste it directly into the form with one tap.
+### 2. Smart AI Auto-Add & 4-Point Perspective Crop/Warp
+* **3-Stage Metadata Pipeline:**
+  1. **ISBN Barcode Scan:** Decodes EAN-13/ISBN-10 barcodes via mobile/desktop camera and queries **Google Books API** and **Open Library API** (free, no cost).
+  2. **Gemini 2.5 Flash Multilingual Vision OCR:** For regional or older books without barcodes, extracts title, author, publisher, price, and back-cover blurb from photos.
+  3. **Interactive 4-Point Crop & Perspective Warp:** Built-in HTML5 canvas homography tool lets you drag 4 corner handles (`TL`, `TR`, `BR`, `BL`) over angled book photos to flatten and crop Front and Back covers before uploading to Google Drive.
 
-### 3. 🏷️ Hybrid Call Number Engine
-* **Auto Home-Library Code:** Automatically generates structured codes in the format `[LANG]-[GENRE]-[AUTHOR3]-[YEAR]` (e.g., `MAL-FIC-BAS-1944`).
-* **Auto Dewey Decimal (DDC):** Pulls suggested Dewey Decimal numbers from Open Library.
-* **Manual Override:** Lock in any custom classification code, with automatic copy suffixes (`c.1`, `c.2`) applied to physical copies.
+### 3. Direct Lending Desk, History & Zero-API WhatsApp Alerts
+* **1-Click Direct Lending:** Lend or return books directly from the Catalog card or the Lending Desk (with inline **"+ New Borrower"** creation).
+* **Full Transaction History:** View borrowing history per individual book or browse the global transaction log.
+* **Custom WhatsApp Templates (`wa.me`):** Edit custom templates with placeholders (`[Member_Name]`, `[Book_Title]`, `[Accession_Number]`, `[Issue_Date]`, `[Due_Date]`) for 1-tap WhatsApp redirects without paid APIs.
 
-### 4. 🔄 Lending (Check-Out) & Borrowing (Check-In) Desk
-* **Double-Lending Prevention:** Uses Google Apps Script `LockService` to prevent issuing a copy that is already lent out or marked *Fragile/Archival Only*.
-* **Loan Limits & Renewals:** Enforces per-member borrowing limits, tracks +7 day renewals, logs return conditions (*New, Good, Worn, Damaged*), and maintains a full audit trail per book and per borrower.
+### 4. Digital Preservation Archive (Google Drive PDF Integration)
+* Upload scanned PDFs of old, rare, or fragile books directly through the web app or auto-sync an entire `/LMS_Digital_Archive` Google Drive folder.
+* Read scanned PDFs directly inside the portal's embedded viewer.
 
-### 5. 💬 Zero-API WhatsApp Reminder Queue (`wa.me`)
-* **Predictive Early Nudges:** Flags books due within 2 days (or 5 days early for borrowers with a history of late returns) and overdue books.
-* **1-Tap Bilingual Redirect:** Opens WhatsApp directly to the borrower's chat with a pre-filled polite reminder in **English** or **Malayalam (`മലയാളം`)** and stamps the `Last_Reminded_Date` in Google Sheets.
-
-### 6. 🏛️ Google Drive Digital Preservation Archive
-* **Auto-Sync Drive Folder:** Drop scanned PDFs/eBooks of old, rare, or damaged books into your `/LMS_Digital_Archive` Google Drive folder and click **Auto-Sync** to link them to your catalog.
-* **Embedded Portal Reader:** Read scanned archival books directly inside the web app without leaving the portal.
-
-### 7. 🖨️ Printable Spine Call Number & QR Sticker Generator
-* Generates A4 print-ready dual stickers featuring a **stacked Spine Call Number** on the left and a **scannable QR Code + Copy ID + Shelf Location** on the right.
+### 5. Space-Saving A4 Spine/QR Stickers & Data Export
+* **Ultra-Dense Printable Stickers:** Print up to ~88 minimalist stickers per A4 sheet (`3mm` margins) containing **Call Number**, **QR Code**, and **Accession Number** only.
+* **View Switcher & Custom Branding:** Toggle between **Card**, **Deck**, and **List** views, customize your Library Name and Profile Picture, and export data anytime to **CSV (UTF-8)** or **JSON**.
 
 ---
- Step-by-Step Implementation Guide
-Part 1: Set Up the Google Sheets Database & Apps Script Backend
-1. Create the Google Sheet:
-  - Go to sheets.new and name the file Home_Library_LMS_Database.
-2. Add the Backend Script:
-  - In the top menu, click Extensions > Apps Script.
-  - Delete any default code in Code.gs, paste the complete backend script, and click Save (💾).
-3. Run the One-Click Installer:
-  - In the top toolbar of the Apps Script editor, select setupLMSDatabaseAndDrive from the function dropdown and click Run.
-  - Click Review Permissions > select your Google account > Advanced > Go to project (unsafe) > Allow.
-  - Verify that all 6 color-coded tabs appear in your Google Sheet and Home_Library_LMS_Storage appears in your Google Drive.
-4. Set Your Librarian Admin PIN:
-  - In the Apps Script left sidebar, click Project Settings (⚙️).
-  - Scroll down to Script Properties > click Add script property:
-    - Property: ADMIN_PIN
-    - Value: Your secret 4–6 digit PIN (e.g., 1234)
-  - Click Save script properties.
-5. Deploy as a Web App API:
-  - Click Deploy (top right) > New deployment.
-  - Click the gear icon next to Select type and choose Web app.
-  - Set Execute as: Me
-  - Set Who has access: Anyone (Required for CORS communication from GitHub Pages; all write operations remain protected by your ADMIN_PIN).
-  - Click Deploy and copy the Web App URL (https://script.google.com/macros/s/.../exec).
-Important Note on Updating Code.gs: Whenever you make changes to Code.gs in the future, click Deploy > Manage deployments > Edit (✏️) > Version: New version > Deploy.
-Part 2: Host the Web App on GitHub Pages
-1. Create a GitHub Repository:
-  - Create a new Public repository on GitHub (e.g., home-library).
-2. Upload the 3 Frontend Files:
-  - Add index.html, manifest.json, and sw.js to the root of your repository and commit your changes.
-3. Enable GitHub Pages:
-  - Go to your repository's Settings > Pages (on the left sidebar).
-  - Under Build and deployment > Branch, select main (folder: /root) and click Save.
-  - Wait ~60 seconds and open your live site at https://<your-username>.github.io/home-library/.
-Part 3: Connect & Install on Android and Windows
-1. Link Your Backend API:
-  - Open your live GitHub Pages URL.
-  - Click ⚙️ Login in the top-right corner.
-  - Paste your Apps Script Web App URL (/exec) and your Librarian Admin PIN, then click Save & Connect.
-2. Install as a Standalone App:
-  - Windows (Chrome / Edge): Click the 📲 Install button in the top navigation bar (or the install icon in your browser's address bar) to add the app to your Desktop and Start Menu.
-  - Android (Chrome): Open the site on your phone and tap 📲 Install (or Three Dots > Install app) to add it to your home screen with full camera barcode scanning support.
-🛠️ Daily Usage Workflow
-1. Adding Books (➕ Add Book):
-  - Tap 📷 Scan ISBN Barcode (or type an ISBN/Title) and click 🔍 Auto-Fetch Book Details.
-  - Snap/upload the Front Cover and Back Cover/Blurb photos.
-  - For regional books (Malayalam/Arabic) or missing blurbs, click 🔍 Extract Text with Google Lens ↗, copy the text in Google Lens, return to the app, and tap 📋 Paste Copied Text into Blurb.
-  - Select your Call Number mode (Auto Home-Code, Auto DDC, or Manual), assign the Room / Shelf / Row, and click 💾 Save Book & Generate Copy ID.
-2. Printing Stickers (🏷️ Labels):
-  - Open the 🏷️ Labels tab, click 🔄 Generate QR Codes, and click 🖨️ Print Sticker Sheet (A4 / PDF).
-3. Issuing & Returning Books (🔄 Lending Desk):
-  - Check-Out: Scan the book's QR sticker (or select from the dropdown), choose the borrower, and click ✅ Issue Book Now.
-  - Check-In: Scan the returned book's QR sticker, verify its physical condition, and click 📥 Complete Return.
-4. Sending Reminders (💬 WhatsApp):
-  - Choose English or മലയാളം (Malayalam) and click 📲 Send WhatsApp Redirect to message borrowers with upcoming or overdue books.
-5. Backing Up Data (📥 Backup):
-  - Click 📥 Backup in the top navigation bar anytime to download a complete CSV snapshot of your catalog.
-🔒 Security & Privacy
-- Zero Credentials in Code: Neither your Google Sheet ID, Web App URL, nor your Admin PIN are hardcoded in the GitHub repository.
-- Client Storage: The Web App URL is saved locally in your browser's localStorage, and your Admin PIN is stored only in temporary sessionStorage (automatically cleared when the browser tab closes).
-- Public View Protection: Without the Admin PIN, all write endpoints in Code.gs reject modifications (401 Unauthorized), and public API snapshots strip out sensitive member details, active loan logs, and book purchase prices.
----
 
-## 🏗️ System Architecture & Repository Files
+## 🛠️ Step-by-Step Setup Guide (For Personal Use)
 
-```text
-├── index.html       # Complete Single-Page Web App (Tailwind CSS + Alpine.js + QR Scanner/Generator)
-├── manifest.json    # PWA Web App Manifest (enables installation on Android & Windows)
-├── sw.js            # Minimal Network Pass-Through Service Worker (triggers browser "Install App" prompt)
-└── README.md        # Project documentation and setup guide
+### Step 1: Set Up the Google Sheets Database & Apps Script Backend
+1. Create a new Google Sheet at [sheets.new](https://sheets.new) and name it **`Home_Library_Database`**.
+2. In the top menu, click **Extensions** → **Apps Script**.
+3. Delete any default code in `Code.gs`, paste the entire contents of [`backend/Code.gs`](./backend/Code.gs), and click **Save (💾)**.
+4. From the function dropdown menu at the top of the Apps Script editor, select **`setupRevampedLMS`** and click **Run**.
+   * Click **Review Permissions** → select your Google account → click **Advanced** → **Go to project (unsafe)** → **Allow**.
+   * This automatically creates and formats all **7 database tabs** and creates your Google Drive storage folders (`/SKD_Home_Library_Storage/LMS_Covers` and `/LMS_Digital_Archive`).
 
+### Step 2: Configure Your Secret PIN & Free Gemini API Key
+1. In the Apps Script editor, click **Project Settings (⚙️)** on the left sidebar.
+2. Scroll down to **Script Properties** and click **Add script property**:
+   * **Property 1:** `ADMIN_PIN` → Value: Set a 4–6 digit secret PIN (e.g., `1234`). This protects all write/edit/lending actions.
+   * **Property 2:** `GEMINI_API_KEY` → Value: Paste your free API key from [Google AI Studio](https://aistudio.google.com/apikey) (used for multilingual photo OCR).
+3. Click **Save script properties**.
 
+### Step 3: Deploy the Backend as a Web App API
+1. In the top right of the Apps Script editor, click **Deploy** → **New deployment**.
+2. Click the gear icon next to *Select type* and choose **Web app**.
+3. Set the following options:
+   * **Description:** `LMS Backend API`
+   * **Execute as:** `Me`
+   * **Who has access:** `Anyone`
+4. Click **Deploy** and copy the generated **Web App URL** (ending in `/exec`).
 
+### Step 4: Host the Frontend on GitHub Pages (Free)
+1. Fork or upload `index.html`, `manifest.json`, and `sw.js` to your GitHub repository.
+2. Go to your repository's **Settings** → **Pages**.
+3. Under **Build and deployment** → **Branch**, select **`main`** (root `/`) and click **Save**.
+4. Wait ~60 seconds and open your live URL: `https://<your-username>.github.io/<repo-name>/`.
+
+### Step 5: Connect & Install on Android and Windows
+1. Open your GitHub Pages website and click **🔒 Login** in the top right.
+2. Paste your Apps Script **Web App URL (`/exec`)** and your **`ADMIN_PIN`**, then click **Save & Connect**.
+   * *Public Visitors:* Anyone opening your link without entering the PIN will see the **Public Catalog (Read-Only)** without shelf locations, prices, or lending controls.
+3. Click **📲 Install** in the header (or browser address bar) to install the portal as a standalone app on **Android** or **Windows**.
