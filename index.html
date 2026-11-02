@@ -3,60 +3,92 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Home Library & Digital Archive</title>
+  <title>SKD Home Library & Digital Archive</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#1e293b" />
 
   <!-- Tailwind CSS & Alpine.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <!-- HTML5 QR/Barcode Scanner -->
+  <!-- Camera Barcode & QR Scanner -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <!-- QR Code Sticker Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
     [x-cloak] { display: none !important; }
+    /* Print-Only Styles for A4 Spine & QR Sticker Sheets */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-label-area, #printable-label-area * { visibility: visible; }
+      #printable-label-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+      }
+      .no-print { display: none !important; }
+      .sticker-card { page-break-inside: avoid; break-inside: avoid; }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col" x-data="lmsApp()" x-init="initApp()">
 
   <!-- TOP NAVIGATION BAR -->
-  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2.5">
         <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" class="w-8 h-8" alt="Logo" />
         <div>
-          <h1 class="font-bold text-lg leading-tight">Home Library & Digital Archive</h1>
-          <p class="text-xs text-slate-400" x-text="isAdmin ? 'Librarian Mode (Unlocked)' : 'Public Catalog View'"></p>
+          <h1 class="font-bold text-base sm:text-lg leading-tight">SKD Home Library & Archive</h1>
+          <p class="text-[11px] text-slate-400" x-text="isAdmin ? 'Librarian Mode (Full Control)' : 'Public Catalog View'"></p>
         </div>
       </div>
 
       <!-- Navigation Tabs -->
-      <nav class="flex items-center gap-1 sm:gap-2 text-sm font-medium">
-        <button @click="activeTab = 'catalog'" :class="activeTab === 'catalog' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'" class="px-3 py-1.5 rounded-lg transition">
+      <nav class="flex flex-wrap items-center gap-1 text-xs sm:text-sm font-medium">
+        <button @click="switchTab('catalog')" :class="activeTab === 'catalog' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
           📚 Catalog (<span x-text="catalog.length"></span>)
         </button>
-        <button @click="activeTab = 'archive'" :class="activeTab === 'archive' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'" class="px-3 py-1.5 rounded-lg transition">
-          🏛️ Digital Archive (<span x-text="digitalArchive.length"></span>)
+        <button @click="switchTab('archive')" :class="activeTab === 'archive' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
+          🏛️ Archive (<span x-text="digitalArchive.length"></span>)
         </button>
-        <button x-show="isAdmin" x-cloak @click="activeTab = 'addBook'" :class="activeTab === 'addBook' ? 'bg-emerald-600 text-white' : 'text-emerald-400 hover:bg-slate-800'" class="px-3 py-1.5 rounded-lg transition">
-          ➕ Auto-Add Book
+        <button x-show="isAdmin" x-cloak @click="switchTab('lending')" :class="activeTab === 'lending' ? 'bg-amber-600 text-white' : 'text-amber-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
+          🔄 Lending Desk (<span x-text="activeTransactions.length"></span>)
+        </button>
+        <button x-show="isAdmin" x-cloak @click="switchTab('members')" :class="activeTab === 'members' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
+          👥 Members (<span x-text="members.length"></span>)
+        </button>
+        <button x-show="isAdmin" x-cloak @click="switchTab('whatsapp')" :class="activeTab === 'whatsapp' ? 'bg-emerald-600 text-white' : 'text-emerald-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition flex items-center gap-1">
+          💬 WhatsApp
+          <span x-show="whatsappQueue.length > 0" class="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold" x-text="whatsappQueue.length"></span>
+        </button>
+        <button x-show="isAdmin" x-cloak @click="switchTab('labels')" :class="activeTab === 'labels' ? 'bg-indigo-600 text-white' : 'text-indigo-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
+          🏷️ Labels
+        </button>
+        <button x-show="isAdmin" x-cloak @click="switchTab('addBook')" :class="activeTab === 'addBook' ? 'bg-teal-600 text-white' : 'text-teal-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
+          ➕ Auto-Add
         </button>
       </nav>
 
-      <!-- Right Controls: Install App, API Config & Admin Lock -->
-      <div class="flex items-center gap-2">
-        <button x-show="installPromptEvent" x-cloak @click="installPWA()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-3 py-1.5 rounded-lg font-semibold">
-          📲 Install App
+      <!-- Right Controls: Install App, Backup & Settings -->
+      <div class="flex items-center gap-1.5">
+        <button x-show="installPromptEvent" x-cloak @click="installPWA()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-2.5 py-1.5 rounded-lg font-semibold">
+          📲 Install
         </button>
-        <button @click="showSettingsModal = true" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg">
-          ⚙️ <span x-text="isAdmin ? 'Admin' : 'Staff Login'"></span>
+        <button x-show="isAdmin" x-cloak @click="exportCatalogCSV()" title="Export Catalog CSV Backup" class="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1.5 rounded-lg">
+          📥 Backup
+        </button>
+        <button @click="showSettingsModal = true" class="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1.5 rounded-lg">
+          ⚙️ <span x-text="isAdmin ? 'Admin' : 'Login'"></span>
         </button>
       </div>
     </div>
   </header>
 
   <!-- LOADING BAR -->
-  <div x-show="loading" x-cloak class="bg-blue-600 text-white text-xs text-center py-1.5 font-medium animate-pulse">
+  <div x-show="loading" x-cloak class="bg-blue-600 text-white text-xs text-center py-1.5 font-medium animate-pulse no-print">
     <span x-text="loadingMessage">Syncing with Google Sheets...</span>
   </div>
 
@@ -66,11 +98,10 @@
     <!-- ================================================================= -->
     <!-- TAB 1: PUBLIC & LIBRARIAN CATALOG                                 -->
     <!-- ================================================================= -->
-    <section x-show="activeTab === 'catalog'" x-cloak>
-      <!-- Search & Filter Bar -->
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+    <section x-show="activeTab === 'catalog'" x-cloak class="no-print">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-5 gap-3">
         <div class="md:col-span-2">
-          <input type="text" x-model="searchQuery" placeholder="Search Title (English/Malayalam/Arabic), Author, ISBN, or Call No..."
+          <input type="text" x-model="searchQuery" placeholder="Search Title (English/Malayalam/Arabic), Author, ISBN, Call No, or Shelf..."
                  class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
         </div>
         <div>
@@ -81,14 +112,22 @@
             </template>
           </select>
         </div>
+        <div>
+          <select x-model="filterGenre" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+            <option value="">All Genres</option>
+            <template x-for="g in uniqueGenres" :key="g">
+              <option :value="g" x-text="g"></option>
+            </template>
+          </select>
+        </div>
         <div class="flex gap-2">
           <select x-model="filterStatus" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
             <option value="">All Availability</option>
-            <option value="Available">Available Only</option>
-            <option value="Lent">Currently Lent</option>
+            <option value="Available">Available Now</option>
+            <option value="Lent">Currently Lent Out</option>
             <option value="Digital">Has Digital Scan</option>
           </select>
-          <button @click="loadSnapshot()" title="Refresh Catalog" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm">🔄</button>
+          <button @click="loadSnapshot()" title="Refresh" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm">🔄</button>
         </div>
       </div>
 
@@ -106,10 +145,8 @@
                   <div class="text-xs" x-text="book.Language"></div>
                 </div>
               </template>
-              <!-- Call Number Badge -->
               <span class="absolute top-2 left-2 bg-slate-900/85 text-white text-[11px] font-mono px-2 py-0.5 rounded"
                     x-text="book.Call_Number || 'UNCLASSIFIED'"></span>
-              <!-- Digital Badge -->
               <span x-show="book.Has_Digital_Copy" class="absolute top-2 right-2 bg-indigo-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded">
                 PDF ARCHIVE
               </span>
@@ -129,7 +166,7 @@
                       x-text="getAvailableCopyCount(book.Book_ID) + ' / ' + getBookCopies(book.Book_ID).length + ' Available'">
                 </span>
                 <button @click="openBookDetailModal(book)" class="text-blue-600 hover:underline font-semibold">
-                  Details & Copies →
+                  Copies & History →
                 </button>
               </div>
             </div>
@@ -141,11 +178,11 @@
     <!-- ================================================================= -->
     <!-- TAB 2: DIGITAL ARCHIVE (GOOGLE DRIVE SCANNED BOOKS)               -->
     <!-- ================================================================= -->
-    <section x-show="activeTab === 'archive'" x-cloak>
+    <section x-show="activeTab === 'archive'" x-cloak class="no-print">
       <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 class="text-lg font-bold text-slate-900">🏛️ Digital Preservation Archive</h2>
-          <p class="text-xs text-slate-500">Scanned PDFs and preserved copies of old, rare, or fragile books stored in Google Drive.</p>
+          <p class="text-xs text-slate-500">Scanned PDFs and preserved copies of old, rare, or fragile books stored in your Google Drive.</p>
         </div>
         <div x-show="isAdmin" class="flex gap-2">
           <button @click="syncDriveFolder()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-lg">
@@ -181,18 +218,345 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- TAB 3: AI AUTO-ADD PIPELINE (CAMERA BARCODE + 1-4 PHOTOS + OCR)   -->
+    <!-- TAB 3: LENDING (CHECK-OUT) & BORROWING (CHECK-IN) DESK            -->
     <!-- ================================================================= -->
-    <section x-show="activeTab === 'addBook'" x-cloak class="max-w-4xl mx-auto">
+    <section x-show="activeTab === 'lending'" x-cloak class="no-print space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- LEFT CARD: ISSUE BOOK (CHECK-OUT) -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">📤 Issue Book (Check-Out)</h2>
+              <p class="text-xs text-slate-500">Scan Copy QR/Barcode or choose an available copy to lend.</p>
+            </div>
+            <button @click="startDeskScanner('checkout')" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+              📷 Scan Copy QR
+            </button>
+          </div>
+
+          <div id="desk-scanner-checkout" class="w-full rounded overflow-hidden mb-3" x-show="deskScannerMode === 'checkout'"></div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">1. Select or Scan Copy ID *</label>
+              <select x-model="checkoutForm.Copy_ID" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">-- Choose Available Copy --</option>
+                <template x-for="c in availableCopiesList" :key="c.Copy_ID">
+                  <option :value="c.Copy_ID" x-text="c.Copy_ID + ' — ' + getBookTitleById(c.Book_ID) + ' (' + c.Copy_Call_Number + ')'"></option>
+                </template>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">2. Select Borrower (Member) *</label>
+              <select x-model="checkoutForm.Member_ID" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">-- Choose Member --</option>
+                <template x-for="m in members" :key="m.Member_ID">
+                  <option :value="m.Member_ID" x-text="m.Full_Name + ' (' + m.Relationship + ' • Active Loans: ' + (m.Active_Loans_Count || 0) + '/' + (m.Max_Loan_Limit || 3) + ')'"></option>
+                </template>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Loan Duration (Days)</label>
+                <input type="number" x-model="checkoutForm.Loan_Days" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Notes (Optional)</label>
+                <input type="text" x-model="checkoutForm.Notes" placeholder="e.g. Handle with care" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+
+            <button @click="submitCheckout()" :disabled="loading" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg text-sm shadow">
+              ✅ Issue Book Now
+            </button>
+          </div>
+        </div>
+
+        <!-- RIGHT CARD: QUICK RETURN (CHECK-IN) BY SCAN -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">📥 Return Book (Check-In)</h2>
+              <p class="text-xs text-slate-500">Scan returned book's QR sticker or select from active loans.</p>
+            </div>
+            <button @click="startDeskScanner('checkin')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+              📷 Scan to Return
+            </button>
+          </div>
+
+          <div id="desk-scanner-checkin" class="w-full rounded overflow-hidden mb-3" x-show="deskScannerMode === 'checkin'"></div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">1. Select Active Loan / Copy ID *</label>
+              <select x-model="checkinForm.Copy_ID" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">-- Select Lent Copy --</option>
+                <template x-for="t in activeTransactions" :key="t.Txn_ID">
+                  <option :value="t.Copy_ID" x-text="t.Copy_ID + ' — ' + getBookTitleById(t.Book_ID) + ' (Borrowed by ' + getMemberNameById(t.Member_ID) + ', Due: ' + String(t.Due_Date).substring(0,10) + ')'"></option>
+                </template>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Return Condition Check</label>
+                <select x-model="checkinForm.Return_Condition" class="w-full border rounded-lg px-3 py-1.5 text-sm bg-white">
+                  <option value="New">New</option>
+                  <option value="Good">Good</option>
+                  <option value="Worn">Worn</option>
+                  <option value="Damaged">Damaged</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Return Notes</label>
+                <input type="text" x-model="checkinForm.Notes" placeholder="Condition remarks..." class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+
+            <button @click="submitCheckin()" :disabled="loading" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-sm shadow">
+              📥 Complete Return & Update Shelf Status
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CURRENTLY LENT BOOKS LEDGER -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-base font-bold text-slate-900 mb-3">📋 Currently Lent Books (Who Has Which Book)</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-100 text-slate-600 uppercase">
+              <tr>
+                <th class="p-3">Copy ID</th>
+                <th class="p-3">Book Title</th>
+                <th class="p-3">Borrower</th>
+                <th class="p-3">Issued On</th>
+                <th class="p-3">Due Date</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="t in activeTransactions" :key="t.Txn_ID">
+                <tr class="hover:bg-slate-50">
+                  <td class="p-3 font-mono font-bold" x-text="t.Copy_ID"></td>
+                  <td class="p-3 font-semibold text-slate-900" x-text="getBookTitleById(t.Book_ID)"></td>
+                  <td class="p-3" x-text="getMemberNameById(t.Member_ID)"></td>
+                  <td class="p-3" x-text="String(t.Issue_Date).substring(0, 10)"></td>
+                  <td class="p-3 font-semibold" :class="isOverdue(t.Due_Date) ? 'text-red-600' : 'text-slate-800'" x-text="String(t.Due_Date).substring(0, 10)"></td>
+                  <td class="p-3">
+                    <span :class="isOverdue(t.Due_Date) ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'" class="px-2 py-0.5 rounded font-bold text-[10px]"
+                          x-text="isOverdue(t.Due_Date) ? 'OVERDUE' : 'LENT (Renewals: ' + (t.Renewal_Count || 0) + ')'"></span>
+                  </td>
+                  <td class="p-3 text-right space-x-1">
+                    <button @click="renewActiveLoan(t)" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded font-semibold">
+                      +7d Renew
+                    </button>
+                    <button @click="quickReturnFromTable(t)" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded font-semibold">
+                      Return
+                    </button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="activeTransactions.length === 0">
+                <td colspan="7" class="p-6 text-center text-slate-400">All books are currently safe in the library!</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 4: MEMBERS / PEOPLE & BORROWING HISTORY                       -->
+    <!-- ================================================================= -->
+    <section x-show="activeTab === 'members'" x-cloak class="no-print space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- ADD / EDIT MEMBER FORM -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-bold text-slate-900 mb-3">➕ Add / Update Member</h3>
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Full Name *</label>
+              <input type="text" x-model="memberForm.Full_Name" placeholder="e.g. Rahul Nair" class="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-600 mb-1">Relationship</label>
+                <select x-model="memberForm.Relationship" class="w-full border rounded-lg px-2 py-2 bg-white">
+                  <option value="Family">Family</option>
+                  <option value="Friend">Friend</option>
+                  <option value="Neighbour">Neighbour</option>
+                  <option value="Owner">Owner</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-600 mb-1">Max Loan Limit</label>
+                <input type="number" x-model="memberForm.Max_Loan_Limit" class="w-full border rounded-lg px-2 py-2" />
+              </div>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">WhatsApp Phone (with Country Code, e.g. 919876543210)</label>
+              <input type="text" x-model="memberForm.Phone_WhatsApp" placeholder="919876543210" class="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Email (Optional)</label>
+              <input type="email" x-model="memberForm.Email" class="w-full border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <button @click="saveMember()" :disabled="loading" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 rounded-lg text-sm shadow">
+              💾 Save Member
+            </button>
+          </div>
+        </div>
+
+        <!-- MEMBER DIRECTORY & HISTORY -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-base font-bold text-slate-900 mb-3">👥 Library Members Directory</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase">
+                <tr>
+                  <th class="p-2.5">Name</th>
+                  <th class="p-2.5">Group</th>
+                  <th class="p-2.5">WhatsApp</th>
+                  <th class="p-2.5">Active Loans</th>
+                  <th class="p-2.5">Trust Score</th>
+                  <th class="p-2.5 text-right">History</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="m in members" :key="m.Member_ID">
+                  <tr class="hover:bg-slate-50">
+                    <td class="p-2.5 font-bold text-slate-900" x-text="m.Full_Name"></td>
+                    <td class="p-2.5" x-text="m.Relationship"></td>
+                    <td class="p-2.5 font-mono" x-text="m.Phone_WhatsApp || '—'"></td>
+                    <td class="p-2.5 font-semibold" x-text="(m.Active_Loans_Count || 0) + ' / ' + (m.Max_Loan_Limit || 3)"></td>
+                    <td class="p-2.5">
+                      <span class="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700" x-text="(m.Trust_Score || 100) + '%'"></span>
+                    </td>
+                    <td class="p-2.5 text-right space-x-1">
+                      <button @click="openMemberHistoryModal(m)" class="text-blue-600 hover:underline font-semibold">View Log →</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 5: ZERO-API WHATSAPP REMINDER QUEUE (wa.me REDIRECT)          -->
+    <!-- ================================================================= -->
+    <section x-show="activeTab === 'whatsapp'" x-cloak class="no-print">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">💬 1-Tap WhatsApp Due & Overdue Reminder Queue</h2>
+          <p class="text-xs text-slate-500">Zero API fees. Clicking "Send WhatsApp" opens WhatsApp directly to the borrower's chat with a pre-filled message and marks today's reminder date.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select x-model="waLang" class="border rounded-lg px-3 py-1.5 text-xs bg-white font-semibold">
+            <option value="en">Message Language: English</option>
+            <option value="ml">Message Language: മലയാളം (Malayalam)</option>
+          </select>
+          <button @click="loadWhatsAppQueue()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg">
+            🔄 Refresh Queue
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <template x-for="item in whatsappQueue" :key="item.Txn_ID">
+          <div class="bg-white p-4 rounded-xl shadow-sm border flex flex-wrap items-center justify-between gap-4"
+               :class="item.Urgency === 'OVERDUE' ? 'border-red-300 bg-red-50/30' : 'border-amber-300'">
+            <div>
+              <div class="flex items-center gap-2">
+                <span :class="item.Urgency === 'OVERDUE' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'"
+                      class="text-[10px] font-bold px-2 py-0.5 rounded" x-text="item.Urgency"></span>
+                <h3 class="font-bold text-slate-900 text-sm" x-text="item.Member_Name + ' — ' + item.Book_Title"></h3>
+                <span class="font-mono text-xs text-slate-500" x-text="'(' + item.Call_Number + ')'"></span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">
+                Due Date: <strong x-text="String(item.Due_Date).substring(0, 10)"></strong> •
+                Last Reminded: <span x-text="String(item.Last_Reminded_Date).substring(0, 10) || 'Never'"></span>
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button @click="sendWhatsAppRedirect(item)"
+                      class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow flex items-center gap-1.5">
+                📲 Send WhatsApp Redirect
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <div x-show="whatsappQueue.length === 0" class="bg-white p-8 rounded-xl border text-center text-slate-400 text-sm">
+          🎉 No overdue or upcoming due reminders needed right now!
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 6: SPINE CALL NUMBER & QR CODE LABEL PRINTER                  -->
+    <!-- ================================================================= -->
+    <section x-show="activeTab === 'labels'" x-cloak>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4 no-print">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">🏷️ Printable Spine Call Number & QR Code Stickers</h2>
+          <p class="text-xs text-slate-500">Prints combined two-part labels: Stacked Spine Call Number on the left + Scannable QR Code & Location on the right.</p>
+        </div>
+        <div class="flex gap-2">
+          <button @click="renderAllStickers()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-lg">
+            🔄 Generate QR Codes (<span x-text="copies.length"></span> Copies)
+          </button>
+          <button @click="window.print()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-5 py-2 rounded-lg shadow">
+            🖨️ Print Sticker Sheet (A4 / PDF)
+          </button>
+        </div>
+      </div>
+
+      <!-- PRINTABLE A4 STICKER GRID -->
+      <div id="printable-label-area" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <template x-for="copy in copies" :key="copy.Copy_ID">
+          <div class="sticker-card bg-white border-2 border-slate-800 rounded-lg p-3 flex items-center justify-between gap-3">
+            <!-- Left Section: Stacked Spine Call Number -->
+            <div class="border-r-2 border-dashed border-slate-400 pr-3 min-w-[85px] text-center font-mono font-extrabold text-xs leading-tight text-slate-900">
+              <template x-for="part in formatStackedCallNo(copy.Copy_Call_Number)">
+                <div x-text="part"></div>
+              </template>
+            </div>
+
+            <!-- Middle Section: Book Title, Copy ID & Shelf Location -->
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">SKD HOME LIBRARY</div>
+              <div class="text-xs font-bold text-slate-900 truncate" x-text="getBookTitleById(copy.Book_ID)"></div>
+              <div class="text-xs font-mono font-bold text-blue-800 mt-0.5" x-text="copy.Copy_ID"></div>
+              <div class="text-[10px] text-slate-600 mt-0.5" x-text="copy.Room + ' • ' + copy.Shelf + ' • ' + copy.Row_Position"></div>
+            </div>
+
+            <!-- Right Section: Scannable QR Code -->
+            <div class="w-16 h-16 flex items-center justify-center bg-white p-1" :id="'qr-' + copy.Copy_ID"></div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 7: AI AUTO-ADD PIPELINE (CAMERA BARCODE + 1-4 PHOTOS + OCR)   -->
+    <!-- ================================================================= -->
+    <section x-show="activeTab === 'addBook'" x-cloak class="max-w-4xl mx-auto no-print">
       <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 class="text-xl font-bold text-slate-900 mb-1">✨ Smart Auto-Add Book Pipeline</h2>
         <p class="text-xs text-slate-500 mb-6">
-          Step 1: Scan ISBN barcode OR snap 1–4 photos (Front Cover, Back Cover, Title/Copyright Page). Supports English, Malayalam (മലയാളം), Arabic (العربية), and Hindi.
+          Scan ISBN barcode OR snap 1–4 photos (Front Cover, Back Cover, Title/Copyright Page). Supports English, Malayalam (മലയാളം), Arabic (العربية), and Hindi.
         </p>
 
-        <!-- STEP 1 & 2: BARCODE SCANNER & PHOTO CAPTURE -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <!-- Barcode Scanner Box -->
           <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-600">1. Fast ISBN Barcode Scan</span>
@@ -200,13 +564,10 @@
                       x-text="scannerActive ? 'Stop Camera' : '📷 Open Barcode Scanner'"></button>
             </div>
             <div id="barcode-reader" class="w-full rounded overflow-hidden mb-2" x-show="scannerActive"></div>
-            <div class="flex gap-2 mt-2">
-              <input type="text" x-model="pipelineInput.isbn" placeholder="Or type ISBN-13 / ISBN-10 here..."
-                     class="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
-            </div>
+            <input type="text" x-model="pipelineInput.isbn" placeholder="Or type ISBN-13 / ISBN-10 here..."
+                   class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm mt-2" />
           </div>
 
-          <!-- 1-4 Photo Capture Box (Vision AI / OCR) -->
           <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-600">2. Snap 1–4 Book Photos (AI OCR)</span>
@@ -215,7 +576,7 @@
                 <input type="file" accept="image/*" capture="environment" multiple @change="handlePhotoSelect($event)" class="hidden" />
               </label>
             </div>
-            <p class="text-[11px] text-slate-500 mb-2">Snap Front Cover, Back Blurb, or Copyright Page (automatically compressed).</p>
+            <p class="text-[11px] text-slate-500 mb-2">Snap Front Cover, Back Blurb, or Copyright Page.</p>
             <div class="flex gap-2 overflow-x-auto py-1">
               <template x-for="(img, idx) in capturedPhotos" :key="idx">
                 <div class="relative w-14 h-18 border rounded overflow-hidden flex-shrink-0">
@@ -227,11 +588,10 @@
           </div>
         </div>
 
-        <!-- Trigger Pipeline Button -->
-        <div class="flex items-center justify-between bg-blue-50 border border-blue-200 p-3.5 rounded-xl mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-blue-50 border border-blue-200 p-3.5 rounded-xl mb-6">
           <label class="flex items-center gap-2 text-xs text-slate-700">
             <input type="checkbox" x-model="pipelineInput.forceAiOcr" class="rounded" />
-            Force Gemini AI Vision OCR even if ISBN barcode is found (best for extracting back-cover blurb & Malayalam/Arabic script)
+            Force Gemini AI Vision OCR even if ISBN barcode is found
           </label>
           <button @click="runAutoAddPipeline()" :disabled="loading"
                   class="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold px-5 py-2 rounded-lg shadow">
@@ -239,16 +599,7 @@
           </button>
         </div>
 
-        <!-- Confidence Banner -->
-        <div x-show="formBook.Confidence_Score !== null" x-cloak class="mb-5 p-3 rounded-lg border flex items-center justify-between"
-             :class="formBook.Confidence_Score >= 80 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900'">
-          <div class="text-xs font-semibold">
-            🎯 Extraction Confidence Score: <span class="font-bold" x-text="formBook.Confidence_Score + '%'"></span>
-          </div>
-          <span class="text-[11px]" x-text="formBook.Confidence_Score >= 80 ? 'High confidence match' : 'Please review fields below before saving'"></span>
-        </div>
-
-        <!-- STEP 7: REVIEW & EDIT FORM (WITH HYBRID CALL NUMBER ENGINE) -->
+        <!-- REVIEW & EDIT FORM -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-200 pt-5">
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Title (English / Transliterated) *</label>
@@ -260,23 +611,17 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Author(s) *</label>
-            <input type="text" x-model="formBook.Authors" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+            <input type="text" x-model="formBook.Authors" @input="updateAutoCallPreview()" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
           </div>
 
           <!-- HYBRID CALL NUMBER SELECTOR -->
           <div class="md:col-span-3 bg-slate-100 p-3.5 rounded-xl border border-slate-300">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <label class="text-xs font-bold text-slate-800">🏷️ Call Number Configuration (Auto-Generate or Manual Override)</label>
+              <label class="text-xs font-bold text-slate-800">🏷️ Call Number Configuration</label>
               <div class="flex gap-2 text-xs">
-                <button type="button" @click="setCallNumberMode('Auto')"
-                        :class="formBook.Call_Number_Mode === 'Auto' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'"
-                        class="px-2.5 py-1 rounded border font-semibold">Auto Home-Code</button>
-                <button type="button" @click="setCallNumberMode('DDC')"
-                        :class="formBook.Call_Number_Mode === 'DDC' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'"
-                        class="px-2.5 py-1 rounded border font-semibold">Auto Dewey (DDC)</button>
-                <button type="button" @click="setCallNumberMode('Manual')"
-                        :class="formBook.Call_Number_Mode === 'Manual' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'"
-                        class="px-2.5 py-1 rounded border font-semibold">✏️ Manual Input</button>
+                <button type="button" @click="setCallNumberMode('Auto')" :class="formBook.Call_Number_Mode === 'Auto' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'" class="px-2.5 py-1 rounded border font-semibold">Auto Home-Code</button>
+                <button type="button" @click="setCallNumberMode('DDC')" :class="formBook.Call_Number_Mode === 'DDC' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'" class="px-2.5 py-1 rounded border font-semibold">Auto Dewey (DDC)</button>
+                <button type="button" @click="setCallNumberMode('Manual')" :class="formBook.Call_Number_Mode === 'Manual' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'" class="px-2.5 py-1 rounded border font-semibold">✏️ Manual Input</button>
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
@@ -284,7 +629,7 @@
                      :class="formBook.Call_Number_Mode !== 'Manual' ? 'bg-slate-200 text-slate-700' : 'bg-white'"
                      class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono font-bold" />
               <span class="text-[11px] text-slate-500">
-                Copy 1 spine label will be saved as: <strong class="font-mono text-slate-800" x-text="(formBook.Call_Number || 'GEN') + ' c.1'"></strong>
+                Copy 1 spine label: <strong class="font-mono text-slate-800" x-text="(formBook.Call_Number || 'GEN') + ' c.1'"></strong>
               </span>
             </div>
           </div>
@@ -328,7 +673,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Google Drive Digital Scan URL (Optional)</label>
-            <input type="text" x-model="formBook.Digital_Drive_URL" placeholder="Paste Drive PDF link if scanned..." class="w-full border rounded-lg px-3 py-1.5 text-xs" />
+            <input type="text" x-model="formBook.Digital_Drive_URL" placeholder="Paste Drive PDF link..." class="w-full border rounded-lg px-3 py-1.5 text-xs" />
           </div>
 
           <div class="md:col-span-3">
@@ -349,10 +694,10 @@
   </main>
 
   <!-- ================================================================= -->
-  <!-- MODAL 1: BOOK DETAILS, COPIES & DIGITAL ARCHIVE LINKER            -->
+  <!-- MODAL 1: BOOK DETAILS, COPIES & FULL BORROWING HISTORY            -->
   <!-- ================================================================= -->
-  <div x-show="selectedBook" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-40">
-    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl" @click.away="selectedBook = null">
+  <div x-show="selectedBook" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-40 no-print">
+    <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl" @click.away="selectedBook = null">
       <template x-if="selectedBook">
         <div>
           <div class="flex justify-between items-start gap-4">
@@ -362,7 +707,10 @@
               <p x-show="selectedBook.Original_Title" class="text-base text-blue-700 font-semibold" x-text="selectedBook.Original_Title"></p>
               <p class="text-xs text-slate-500 mt-0.5" x-text="selectedBook.Authors + ' • ' + (selectedBook.Publisher || '') + ' (' + (selectedBook.Publish_Year || 'N/A') + ')'"></p>
             </div>
-            <button @click="selectedBook = null" class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+            <div class="flex items-center gap-2">
+              <button x-show="isAdmin" @click="deleteBookRecord(selectedBook.Book_ID)" class="text-xs text-red-600 hover:underline font-semibold">🗑️ Delete</button>
+              <button @click="selectedBook = null" class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+            </div>
           </div>
 
           <p class="text-sm text-slate-700 mt-4 whitespace-pre-line" x-text="selectedBook.Description || 'No description.'"></p>
@@ -372,18 +720,18 @@
             <div class="flex items-center justify-between mb-2">
               <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Physical Copies & Locations</h4>
               <button x-show="isAdmin" @click="addAnotherCopy(selectedBook)" class="text-xs bg-slate-900 text-white px-2.5 py-1 rounded font-semibold">
-                + Add Duplicate Physical Copy
+                + Add Duplicate Copy
               </button>
             </div>
             <div class="border rounded-xl overflow-hidden">
               <table class="w-full text-left text-xs">
                 <thead class="bg-slate-100 text-slate-600">
                   <tr>
-                    <th class="p-2.5">Copy Barcode</th>
+                    <th class="p-2.5">Copy ID</th>
                     <th class="p-2.5">Spine Call No.</th>
                     <th class="p-2.5">Location</th>
                     <th class="p-2.5">Condition</th>
-                    <th class="p-2.5">Status</th>
+                    <th class="p-2.5">Status / Holder</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y">
@@ -393,7 +741,37 @@
                       <td class="p-2.5 font-mono" x-text="copy.Copy_Call_Number"></td>
                       <td class="p-2.5" x-text="copy.Room + ' > ' + copy.Shelf + ' > ' + copy.Row_Position"></td>
                       <td class="p-2.5" x-text="copy.Condition"></td>
-                      <td class="p-2.5 font-semibold" :class="copy.Status === 'Available' ? 'text-emerald-600' : 'text-amber-600'" x-text="copy.Status"></td>
+                      <td class="p-2.5 font-semibold" :class="copy.Status === 'Available' ? 'text-emerald-600' : 'text-amber-600'"
+                          x-text="copy.Status === 'Lent' ? 'Lent to ' + getCurrentHolderName(copy.Copy_ID) : copy.Status"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Book Transaction History Log -->
+          <div x-show="isAdmin" class="mt-6">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">📜 Lending & Transaction History for This Book</h4>
+            <div class="border rounded-xl overflow-hidden">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th class="p-2">Copy</th>
+                    <th class="p-2">Borrower</th>
+                    <th class="p-2">Issued</th>
+                    <th class="p-2">Returned</th>
+                    <th class="p-2">Condition (Out → In)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="t in getBookTransactions(selectedBook.Book_ID)" :key="t.Txn_ID">
+                    <tr>
+                      <td class="p-2 font-mono" x-text="t.Copy_ID"></td>
+                      <td class="p-2 font-semibold" x-text="getMemberNameById(t.Member_ID)"></td>
+                      <td class="p-2" x-text="String(t.Issue_Date).substring(0,10)"></td>
+                      <td class="p-2" x-text="t.Return_Date ? String(t.Return_Date).substring(0,10) : 'Still Out'"></td>
+                      <td class="p-2" x-text="t.Issue_Condition + ' → ' + (t.Return_Condition || '...')"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -406,9 +784,53 @@
   </div>
 
   <!-- ================================================================= -->
-  <!-- MODAL 2: EMBEDDED GOOGLE DRIVE DIGITAL ARCHIVE PDF READER         -->
+  <!-- MODAL 2: MEMBER BORROWING DOSSIER / HISTORY                       -->
   <!-- ================================================================= -->
-  <div x-show="activePdfItem" x-cloak class="fixed inset-0 bg-slate-900/80 flex flex-col z-50 p-2 sm:p-6">
+  <div x-show="selectedMember" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-40 no-print">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 shadow-xl" @click.away="selectedMember = null">
+      <template x-if="selectedMember">
+        <div>
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900" x-text="selectedMember.Full_Name + ' — Borrowing History'"></h3>
+              <p class="text-xs text-slate-500" x-text="selectedMember.Relationship + ' • Trust Score: ' + (selectedMember.Trust_Score || 100) + '%'"></p>
+            </div>
+            <button @click="selectedMember = null" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+          </div>
+          <div class="border rounded-xl overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600">
+                <tr>
+                  <th class="p-2.5">Book Title</th>
+                  <th class="p-2.5">Copy ID</th>
+                  <th class="p-2.5">Issued</th>
+                  <th class="p-2.5">Due</th>
+                  <th class="p-2.5">Returned</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="t in getMemberTransactions(selectedMember.Member_ID)" :key="t.Txn_ID">
+                  <tr>
+                    <td class="p-2.5 font-bold" x-text="getBookTitleById(t.Book_ID)"></td>
+                    <td class="p-2.5 font-mono" x-text="t.Copy_ID"></td>
+                    <td class="p-2.5" x-text="String(t.Issue_Date).substring(0,10)"></td>
+                    <td class="p-2.5" x-text="String(t.Due_Date).substring(0,10)"></td>
+                    <td class="p-2.5 font-semibold" :class="t.Return_Date ? 'text-emerald-600' : 'text-amber-600'"
+                        x-text="t.Return_Date ? String(t.Return_Date).substring(0,10) : 'Currently Reading'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAL 3: EMBEDDED GOOGLE DRIVE DIGITAL ARCHIVE PDF READER         -->
+  <!-- ================================================================= -->
+  <div x-show="activePdfItem" x-cloak class="fixed inset-0 bg-slate-900/80 flex flex-col z-50 p-2 sm:p-6 no-print">
     <div class="bg-slate-900 text-white px-4 py-2.5 rounded-t-xl flex items-center justify-between">
       <div class="text-sm font-bold" x-text="activePdfItem ? getBookTitleById(activePdfItem.Book_ID) : ''"></div>
       <button @click="activePdfItem = null" class="bg-red-600 hover:bg-red-500 text-xs font-bold px-3 py-1 rounded">Close Reader ✕</button>
@@ -421,12 +843,12 @@
   </div>
 
   <!-- ================================================================= -->
-  <!-- MODAL 3: API URL & LIBRARIAN PIN SETTINGS                         -->
+  <!-- MODAL 4: API URL & LIBRARIAN PIN SETTINGS                         -->
   <!-- ================================================================= -->
-  <div x-show="showSettingsModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
+  <div x-show="showSettingsModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 no-print">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
       <h3 class="text-lg font-bold text-slate-900 mb-1">⚙️ Connection & Librarian Login</h3>
-      <p class="text-xs text-slate-500 mb-4">Connect your Phase 1 Google Apps Script Web App URL and enter your PIN to unlock Librarian tools.</p>
+      <p class="text-xs text-slate-500 mb-4">Connect your Google Apps Script Web App URL and enter your PIN to unlock Librarian tools.</p>
 
       <div class="space-y-3">
         <div>
@@ -448,7 +870,6 @@
 
   <!-- APPLICATION LOGIC -->
   <script>
-    // Register minimal Service Worker for Android & Windows App Installability
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
@@ -468,16 +889,28 @@
         catalog: [],
         copies: [],
         digitalArchive: [],
+        members: [],
+        transactions: [],
+        whatsappQueue: [],
+        waLang: 'en',
 
         searchQuery: '',
         filterLanguage: '',
+        filterGenre: '',
         filterStatus: '',
 
         selectedBook: null,
+        selectedMember: null,
         activePdfItem: null,
 
-        // Scanner & AI Pipeline state
+        // Lending & Checkin Forms
+        checkoutForm: { Copy_ID: '', Member_ID: '', Loan_Days: 14, Notes: '' },
+        checkinForm: { Copy_ID: '', Return_Condition: 'Good', Notes: '' },
+        memberForm: { Full_Name: '', Relationship: 'Friend', Phone_WhatsApp: '', Email: '', Max_Loan_Limit: 3 },
+
+        // Scanners
         scannerActive: false,
+        deskScannerMode: '',
         html5QrCode: null,
         capturedPhotos: [],
         pipelineInput: { isbn: '', forceAiOcr: false },
@@ -494,6 +927,13 @@
           } else {
             this.loadSnapshot();
           }
+        },
+
+        switchTab(tab) {
+          this.stopScanner();
+          this.activeTab = tab;
+          if (tab === 'whatsapp' && this.isAdmin) this.loadWhatsAppQueue();
+          if (tab === 'labels') this.$nextTick(() => this.renderAllStickers());
         },
 
         async installPWA() {
@@ -513,7 +953,7 @@
         async loadSnapshot() {
           if (!this.apiUrl) return;
           this.loading = true;
-          this.loadingMessage = 'Fetching live catalog from Google Sheets...';
+          this.loadingMessage = 'Syncing live data with Google Sheets...';
           try {
             const role = this.isAdmin ? 'Admin' : 'Guest';
             const res = await fetch(`${this.apiUrl}?action=getInitialSnapshot&role=${role}`);
@@ -522,8 +962,9 @@
               this.catalog = data.catalog || [];
               this.copies = data.copies || [];
               this.digitalArchive = data.digitalArchive || [];
-            } else {
-              alert('API Error: ' + data.message);
+              this.members = data.members || [];
+              this.transactions = data.transactions || [];
+              if (this.isAdmin) this.loadWhatsAppQueue();
             }
           } catch (err) {
             alert('Failed to connect to Apps Script URL. Check Settings.');
@@ -536,54 +977,312 @@
           return [...new Set(this.catalog.map(b => b.Language).filter(Boolean))];
         },
 
+        get uniqueGenres() {
+          const all = [];
+          this.catalog.forEach(b => {
+            String(b.Genres || '').split(',').forEach(g => {
+              if (g.trim()) all.push(g.trim());
+            });
+          });
+          return [...new Set(all)];
+        },
+
+        get availableCopiesList() {
+          return this.copies.filter(c => c.Status === 'Available');
+        },
+
+        get activeTransactions() {
+          return this.transactions.filter(t => t.Status === 'Active' || t.Status === 'Overdue');
+        },
+
         get filteredCatalog() {
           const q = this.searchQuery.toLowerCase().trim();
           return this.catalog.filter(b => {
+            const copyLocs = this.getBookCopies(b.Book_ID).map(c => `${c.Copy_ID} ${c.Room} ${c.Shelf}`).join(' ').toLowerCase();
             const matchesQuery = !q ||
               String(b.Title || '').toLowerCase().includes(q) ||
               String(b.Original_Title || '').toLowerCase().includes(q) ||
               String(b.Authors || '').toLowerCase().includes(q) ||
               String(b.ISBN_13 || '').toLowerCase().includes(q) ||
-              String(b.Call_Number || '').toLowerCase().includes(q);
+              String(b.Call_Number || '').toLowerCase().includes(q) ||
+              copyLocs.includes(q);
 
             const matchesLang = !this.filterLanguage || b.Language === this.filterLanguage;
+            const matchesGenre = !this.filterGenre || String(b.Genres || '').includes(this.filterGenre);
 
             let matchesStatus = true;
             if (this.filterStatus === 'Available') matchesStatus = this.getAvailableCopyCount(b.Book_ID) > 0;
             else if (this.filterStatus === 'Lent') matchesStatus = this.getAvailableCopyCount(b.Book_ID) === 0 && this.getBookCopies(b.Book_ID).length > 0;
             else if (this.filterStatus === 'Digital') matchesStatus = Boolean(b.Has_Digital_Copy);
 
-            return matchesQuery && matchesLang && matchesStatus;
+            return matchesQuery && matchesLang && matchesGenre && matchesStatus;
           });
         },
 
-        getBookCopies(bookId) {
-          return this.copies.filter(c => c.Book_ID === bookId);
+        getBookCopies(bookId) { return this.copies.filter(c => c.Book_ID === bookId); },
+        getAvailableCopyCount(bookId) { return this.copies.filter(c => c.Book_ID === bookId && c.Status === 'Available').length; },
+        getBookTitleById(bookId) { const b = this.catalog.find(x => x.Book_ID === bookId); return b ? b.Title : bookId; },
+        getMemberNameById(memId) { const m = this.members.find(x => x.Member_ID === memId); return m ? m.Full_Name : memId; },
+        getCurrentHolderName(copyId) {
+          const t = this.activeTransactions.find(x => x.Copy_ID === copyId);
+          return t ? this.getMemberNameById(t.Member_ID) : 'Unknown';
+        },
+        getBookTransactions(bookId) { return this.transactions.filter(t => t.Book_ID === bookId).reverse(); },
+        getMemberTransactions(memId) { return this.transactions.filter(t => t.Member_ID === memId).reverse(); },
+
+        isOverdue(dueDateStr) {
+          if (!dueDateStr) return false;
+          const today = new Date().toISOString().substring(0, 10);
+          return String(dueDateStr).substring(0, 10) < today;
         },
 
-        getAvailableCopyCount(bookId) {
-          return this.copies.filter(c => c.Book_ID === bookId && c.Status === 'Available').length;
-        },
+        openBookDetailModal(book) { this.selectedBook = book; },
+        openMemberHistoryModal(member) { this.selectedMember = member; },
+        openPdfViewer(item) { this.activePdfItem = item; },
 
-        getBookTitleById(bookId) {
-          const b = this.catalog.find(x => x.Book_ID === bookId);
-          return b ? b.Title : bookId;
-        },
-
-        openBookDetailModal(book) {
-          this.selectedBook = book;
-        },
-
-        openPdfViewer(item) {
-          this.activePdfItem = item;
-        },
-
-        // BARCODE SCANNER
-        toggleBarcodeScanner() {
-          if (this.scannerActive) {
+        // =================================================================
+        // LENDING (CHECK-OUT), RETURN (CHECK-IN) & RENEWAL LOGIC
+        // =================================================================
+        startDeskScanner(mode) {
+          if (this.deskScannerMode === mode) {
             this.stopScanner();
             return;
           }
+          this.stopScanner();
+          this.deskScannerMode = mode;
+          const targetDiv = mode === 'checkout' ? 'desk-scanner-checkout' : 'desk-scanner-checkin';
+          this.$nextTick(() => {
+            this.html5QrCode = new Html5Qrcode(targetDiv);
+            this.html5QrCode.start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 220, height: 150 } },
+              (decodedText) => {
+                if (mode === 'checkout') this.checkoutForm.Copy_ID = decodedText.trim();
+                else this.checkinForm.Copy_ID = decodedText.trim();
+                this.stopScanner();
+              },
+              () => {}
+            ).catch(err => {
+              alert('Camera error: ' + err);
+              this.deskScannerMode = '';
+            });
+          });
+        },
+
+        async submitCheckout() {
+          if (!this.checkoutForm.Copy_ID || !this.checkoutForm.Member_ID) {
+            alert('Please select both a Copy ID and a Member.');
+            return;
+          }
+          this.loading = true;
+          this.loadingMessage = 'Issuing book and locking copy status...';
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'checkoutBook',
+                pin: this.adminPin,
+                data: this.checkoutForm
+              })
+            });
+            const out = await res.json();
+            if (out.status === 'ok') {
+              alert(`Checked out ${out.transaction.Copy_ID}! Due on ${out.transaction.Due_Date}`);
+              this.checkoutForm = { Copy_ID: '', Member_ID: '', Loan_Days: 14, Notes: '' };
+              await this.loadSnapshot();
+            } else {
+              alert('Checkout blocked: ' + out.message);
+            }
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async submitCheckin() {
+          if (!this.checkinForm.Copy_ID) {
+            alert('Please select or scan a Copy ID to return.');
+            return;
+          }
+          this.loading = true;
+          this.loadingMessage = 'Processing book return...';
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'returnBook',
+                pin: this.adminPin,
+                data: this.checkinForm
+              })
+            });
+            const out = await res.json();
+            if (out.status === 'ok') {
+              alert(`Returned successfully! (${out.daysLate > 0 ? out.daysLate + ' days late' : 'On time'})`);
+              this.checkinForm = { Copy_ID: '', Return_Condition: 'Good', Notes: '' };
+              await this.loadSnapshot();
+            } else {
+              alert('Return error: ' + out.message);
+            }
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async quickReturnFromTable(txn) {
+          const cond = prompt('Confirm Return Condition (New, Good, Worn, Damaged):', txn.Issue_Condition || 'Good');
+          if (!cond) return;
+          this.checkinForm = { Copy_ID: txn.Copy_ID, Return_Condition: cond, Notes: '' };
+          await this.submitCheckin();
+        },
+
+        async renewActiveLoan(txn) {
+          this.loading = true;
+          this.loadingMessage = 'Extending due date by 7 days...';
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'renewLoan',
+                pin: this.adminPin,
+                data: { Txn_ID: txn.Txn_ID, Extra_Days: 7 }
+              })
+            });
+            const out = await res.json();
+            if (out.status === 'ok') {
+              alert(`Loan renewed! New Due Date: ${out.transaction.Due_Date}`);
+              await this.loadSnapshot();
+            } else {
+              alert('Renewal blocked: ' + out.message);
+            }
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        // =================================================================
+        // MEMBER MANAGEMENT
+        // =================================================================
+        async saveMember() {
+          if (!this.memberForm.Full_Name) { alert('Member Name is required.'); return; }
+          this.loading = true;
+          this.loadingMessage = 'Saving member to Google Sheets...';
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'addOrUpdateMember',
+                pin: this.adminPin,
+                data: this.memberForm
+              })
+            });
+            const out = await res.json();
+            if (out.status === 'ok') {
+              this.memberForm = { Full_Name: '', Relationship: 'Friend', Phone_WhatsApp: '', Email: '', Max_Loan_Limit: 3 };
+              await this.loadSnapshot();
+            } else {
+              alert('Error: ' + out.message);
+            }
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        // =================================================================
+        // ZERO-API WHATSAPP REMINDER REDIRECT
+        // =================================================================
+        async loadWhatsAppQueue() {
+          try {
+            const res = await fetch(`${this.apiUrl}?action=getWhatsAppQueue`);
+            const out = await res.json();
+            if (out.status === 'ok') this.whatsappQueue = out.reminders || [];
+          } catch (e) {}
+        },
+
+        async sendWhatsAppRedirect(item) {
+          if (!item.Phone_WhatsApp) {
+            alert('This member does not have a WhatsApp phone number saved in Members.');
+            return;
+          }
+          let msg = item.Message_Preview;
+          if (this.waLang === 'ml') {
+            msg = `നമസ്കാരം ${item.Member_Name}, SKD ഹോം ലൈബ്രറിയിൽ നിന്നുള്ള ഓർമ്മപ്പെടുത്തൽ! നിങ്ങൾ എടുത്ത *"${item.Book_Title}"* (${item.Call_Number}) എന്ന പുസ്തകം തിരികെ നൽകേണ്ട തീയതി *${String(item.Due_Date).substring(0,10)}* ആണ്. കാലാവധി നീട്ടണമെങ്കിലോ തിരികെ നൽകാനോ ദയവായി അറിയിക്കുക. നന്ദി!`;
+          }
+          const url = `https://wa.me/${item.Phone_WhatsApp}?text=${encodeURIComponent(msg)}`;
+          window.open(url, '_blank');
+
+          // Stamp Last_Reminded_Date in Google Sheets
+          await fetch(this.apiUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'markReminderSent', pin: this.adminPin, txnId: item.Txn_ID })
+          });
+          await this.loadWhatsAppQueue();
+        },
+
+        // =================================================================
+        // SPINE CALL NUMBER & QR STICKER GENERATOR
+        // =================================================================
+        formatStackedCallNo(callNo) {
+          return String(callNo || 'UNCL').replace(/-/g, ' ').split(/\s+/).filter(Boolean);
+        },
+
+        renderAllStickers() {
+          this.copies.forEach(copy => {
+            const el = document.getElementById('qr-' + copy.Copy_ID);
+            if (el) {
+              el.innerHTML = '';
+              new QRCode(el, {
+                text: copy.Copy_ID,
+                width: 56,
+                height: 56,
+                correctLevel: QRCode.CorrectLevel.M
+              });
+            }
+          });
+        },
+
+        // =================================================================
+        // CSV BACKUP & DELETE
+        // =================================================================
+        exportCatalogCSV() {
+          if (!this.catalog.length) return;
+          const headers = Object.keys(this.catalog[0]);
+          const csvRows = [
+            headers.join(','),
+            ...this.catalog.map(row => headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))
+          ];
+          const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `SKD_Library_Backup_${new Date().toISOString().substring(0,10)}.csv`;
+          link.click();
+        },
+
+        async deleteBookRecord(bookId) {
+          if (!confirm('Are you sure you want to delete this book from the catalog?')) return;
+          this.loading = true;
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'deleteRecord',
+                pin: this.adminPin,
+                data: { table: '1_Catalog', pkColumn: 'Book_ID', id: bookId }
+              })
+            });
+            const out = await res.json();
+            if (out.status === 'ok') {
+              this.selectedBook = null;
+              await this.loadSnapshot();
+            }
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        // =================================================================
+        // AUTO-ADD BARCODE & PHOTO OCR PIPELINE
+        // =================================================================
+        toggleBarcodeScanner() {
+          if (this.scannerActive) { this.stopScanner(); return; }
           this.scannerActive = true;
           this.$nextTick(() => {
             this.html5QrCode = new Html5Qrcode("barcode-reader");
@@ -596,10 +1295,7 @@
                 this.runAutoAddPipeline();
               },
               () => {}
-            ).catch(err => {
-              alert('Camera error: ' + err);
-              this.scannerActive = false;
-            });
+            ).catch(err => { alert('Camera error: ' + err); this.scannerActive = false; });
           });
         },
 
@@ -608,13 +1304,14 @@
             this.html5QrCode.stop().then(() => {
               this.html5QrCode.clear();
               this.scannerActive = false;
-            }).catch(() => { this.scannerActive = false; });
+              this.deskScannerMode = '';
+            }).catch(() => { this.scannerActive = false; this.deskScannerMode = ''; });
           } else {
             this.scannerActive = false;
+            this.deskScannerMode = '';
           }
         },
 
-        // CLIENT-SIDE IMAGE COMPRESSION FOR 1-4 PHOTOS
         handlePhotoSelect(event) {
           const files = Array.from(event.target.files).slice(0, 4);
           files.forEach(file => {
@@ -629,8 +1326,7 @@
                 else if (h > maxDim) { w *= maxDim / h; h = maxDim; }
                 canvas.width = w; canvas.height = h;
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                this.capturedPhotos.push({ base64: compressedBase64, mimeType: 'image/jpeg' });
+                this.capturedPhotos.push({ base64: canvas.toDataURL('image/jpeg', 0.8), mimeType: 'image/jpeg' });
               };
               img.src = e.target.result;
             };
@@ -659,13 +1355,8 @@
               })
             });
             const out = await res.json();
-            if (out.status === 'ok') {
-              this.formBook = { ...this.formBook, ...out.book };
-            } else {
-              alert('Pipeline Error: ' + out.message);
-            }
-          } catch (e) {
-            alert('Request failed: ' + e.message);
+            if (out.status === 'ok') this.formBook = { ...this.formBook, ...out.book };
+            else alert('Pipeline Error: ' + out.message);
           } finally {
             this.loading = false;
           }
@@ -673,11 +1364,8 @@
 
         setCallNumberMode(mode) {
           this.formBook.Call_Number_Mode = mode;
-          if (mode === 'Auto') {
-            this.updateAutoCallPreview();
-          } else if (mode === 'DDC') {
-            this.formBook.Call_Number = this.formBook.Suggested_DDC || '000 GEN';
-          }
+          if (mode === 'Auto') this.updateAutoCallPreview();
+          else if (mode === 'DDC') this.formBook.Call_Number = this.formBook.Suggested_DDC || '000 GEN';
         },
 
         updateAutoCallPreview() {
@@ -711,34 +1399,24 @@
           try {
             const res = await fetch(this.apiUrl, {
               method: 'POST',
-              body: JSON.stringify({
-                action: 'addOrUpdateBook',
-                pin: this.adminPin,
-                data: this.formBook
-              })
+              body: JSON.stringify({ action: 'addOrUpdateBook', pin: this.adminPin, data: this.formBook })
             });
             const out = await res.json();
             if (out.status === 'duplicate_detected') {
-              if (confirm(`Duplicate detected: "${out.existingBook.Title}" is already in your catalog. Click OK to add a new physical copy to that existing book instead.`)) {
+              if (confirm(`Duplicate detected: "${out.existingBook.Title}" is already in your catalog. Add a second physical copy instead?`)) {
                 await this.addAnotherCopy(out.existingBook);
               }
             } else if (out.status === 'ok') {
               if (this.formBook.Digital_Drive_URL) {
                 await fetch(this.apiUrl, {
                   method: 'POST',
-                  body: JSON.stringify({
-                    action: 'linkDigitalCopy',
-                    pin: this.adminPin,
-                    data: { Book_ID: out.book.Book_ID, Drive_URL: this.formBook.Digital_Drive_URL }
-                  })
+                  body: JSON.stringify({ action: 'linkDigitalCopy', pin: this.adminPin, data: { Book_ID: out.book.Book_ID, Drive_URL: this.formBook.Digital_Drive_URL } })
                 });
               }
-              alert(`Saved! Assigned Copy Barcode: ${out.copy ? out.copy.Copy_ID : 'N/A'} (${out.book.Call_Number})`);
+              alert(`Saved! Assigned Copy ID: ${out.copy ? out.copy.Copy_ID : 'N/A'}`);
               this.resetFormBook();
               await this.loadSnapshot();
               this.activeTab = 'catalog';
-            } else {
-              alert('Error: ' + out.message);
             }
           } finally {
             this.loading = false;
@@ -753,15 +1431,11 @@
           try {
             const res = await fetch(this.apiUrl, {
               method: 'POST',
-              body: JSON.stringify({
-                action: 'addPhysicalCopy',
-                pin: this.adminPin,
-                data: { Book_ID: book.Book_ID, Base_Call_Number: book.Call_Number, Room: room, Shelf: shelf }
-              })
+              body: JSON.stringify({ action: 'addPhysicalCopy', pin: this.adminPin, data: { Book_ID: book.Book_ID, Base_Call_Number: book.Call_Number, Room: room, Shelf: shelf } })
             });
             const out = await res.json();
             if (out.status === 'ok') {
-              alert(`Added new copy: ${out.copy.Copy_ID} (${out.copy.Copy_Call_Number})`);
+              alert(`Added copy: ${out.copy.Copy_ID} (${out.copy.Copy_Call_Number})`);
               await this.loadSnapshot();
             }
           } finally {
@@ -771,7 +1445,6 @@
 
         async syncDriveFolder() {
           this.loading = true;
-          this.loadingMessage = 'Scanning /LMS_Digital_Archive folder in Google Drive...';
           try {
             const res = await fetch(this.apiUrl, {
               method: 'POST',
@@ -779,10 +1452,8 @@
             });
             const out = await res.json();
             if (out.status === 'ok') {
-              alert(`Sync complete! Newly linked digital archive files: ${out.newlyLinkedCount}`);
+              alert(`Synced! Newly linked files: ${out.newlyLinkedCount}`);
               await this.loadSnapshot();
-            } else {
-              alert('Error: ' + out.message);
             }
           } finally {
             this.loading = false;
