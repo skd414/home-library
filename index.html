@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SKD Home Library</title>
+  <title>Home Library & Archive</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#2563eb" />
 
@@ -31,8 +31,14 @@
   <style>
     [x-cloak] { display: none !important; }
     body { background-color: #f8fafc; color: #1e293b; }
-    /* Minimalist Small Spine & QR Sticker Print Layout */
+
+    /* Ultra Space-Saving A4 Print Rules */
+    @page {
+      size: A4 portrait;
+      margin: 3mm;
+    }
     @media print {
+      body { background: #ffffff !important; margin: 0 !important; padding: 0 !important; }
       body * { visibility: hidden; }
       #printable-stickers, #printable-stickers * { visibility: visible; }
       #printable-stickers {
@@ -41,13 +47,15 @@
         top: 0;
         width: 100%;
         background: #ffffff !important;
-        padding: 4mm;
+        margin: 0 !important;
+        padding: 0 !important;
       }
       .no-print { display: none !important; }
       .mini-sticker {
         page-break-inside: avoid;
         break-inside: avoid;
-        border: 1px solid #cbd5e1 !important;
+        border: 0.5pt solid #94a3b8 !important;
+        border-radius: 2px !important;
       }
     }
   </style>
@@ -55,19 +63,24 @@
 <body class="min-h-screen flex flex-col pb-20 md:pb-6" x-data="flatLibraryApp()" x-init="initApp()">
 
   <!-- ===================================================================== -->
-  <!-- FLAT TOP HEADER BAR                                                   -->
+  <!-- TOP HEADER BAR (WITH CUSTOM LIBRARY PROFILE PICTURE & NAME)           -->
   <!-- ===================================================================== -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30 no-print">
     <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-      <!-- Logo & Title -->
-      <div class="flex items-center gap-3 cursor-pointer" @click="resetAllFilters(); switchTab('catalog')">
-        <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
-          📚
+      <!-- Custom Library Profile Picture & Name -->
+      <div class="flex items-center gap-3 cursor-pointer min-w-0" @click="resetAllFilters(); switchTab('catalog')">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg overflow-hidden flex-shrink-0 border border-slate-200">
+          <template x-if="libraryLogo">
+            <img :src="libraryLogo" class="w-full h-full object-cover" alt="Logo" />
+          </template>
+          <template x-if="!libraryLogo">
+            <span>📚</span>
+          </template>
         </div>
-        <div>
-          <h1 class="font-bold text-base sm:text-lg text-slate-900 leading-tight">SKD Home Library</h1>
-          <span class="text-xs font-medium" :class="isAdmin ? 'text-emerald-600' : 'text-slate-400'"
-                x-text="isAdmin ? '● Librarian Mode' : '● Public Catalog'"></span>
+        <div class="min-w-0">
+          <h1 class="font-bold text-base sm:text-lg text-slate-900 leading-tight truncate" x-text="libraryName"></h1>
+          <span class="text-xs font-medium block truncate" :class="isAdmin ? 'text-emerald-600' : 'text-slate-400'"
+                x-text="isAdmin ? '● ' + libraryTagline + ' (Librarian)' : '● ' + libraryTagline"></span>
         </div>
       </div>
 
@@ -77,54 +90,64 @@
           📚 Catalog (<span x-text="catalog.length"></span>)
         </button>
         <button x-show="isAdmin" x-cloak @click="switchTab('lending')" :class="activeTab === 'lending' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'" class="px-4 py-2 rounded-lg transition">
-          🔄 Active Loans (<span x-text="activeLoans.length"></span>)
+          🔄 Loans & History (<span x-text="activeLoans.length"></span>)
         </button>
         <button @click="switchTab('archive')" :class="activeTab === 'archive' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'" class="px-4 py-2 rounded-lg transition">
           🏛️ PDF Archive (<span x-text="digitalArchive.length"></span>)
         </button>
         <button x-show="isAdmin" x-cloak @click="switchTab('manage')" :class="activeTab === 'manage' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'" class="px-4 py-2 rounded-lg transition">
-          ⚙️ Manage & Stickers
+          ⚙️ Manage
         </button>
       </nav>
 
       <!-- Right Action Buttons -->
       <div class="flex items-center gap-2">
+        <button @click="openScannerModal('home')" title="Scan Book QR or Barcode"
+                class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition flex items-center gap-1">
+          <span>📷</span><span class="hidden sm:inline">Scan QR</span>
+        </button>
         <button x-show="isAdmin" x-cloak @click="openNewBookForm()"
                 class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition">
           + Add Book
         </button>
         <button x-show="installPromptEvent" x-cloak @click="installPWA()"
-                class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-semibold px-3 py-2 rounded-xl transition">
+                class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-semibold px-3 py-2 rounded-xl transition hidden sm:inline-block">
           📲 Install
         </button>
         <button @click="showLoginModal = true"
                 class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition">
-          <span x-text="isAdmin ? '🔓 Admin' : '🔒 Login'"></span>
+          <span x-text="isAdmin ? '🔓' : '🔒 Login'"></span>
         </button>
       </div>
     </div>
   </header>
 
   <!-- MOBILE BOTTOM BAR -->
-  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 z-30 grid grid-cols-4 py-1.5 text-[11px] font-semibold text-slate-500 no-print">
+  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 z-30 grid grid-cols-5 py-1.5 text-[10px] font-semibold text-slate-500 no-print">
     <button @click="switchTab('catalog')" :class="activeTab === 'catalog' ? 'text-blue-600' : ''" class="flex flex-col items-center py-1">
       <span class="text-base">📚</span><span>Catalog</span>
     </button>
-    <button x-show="isAdmin" @click="switchTab('lending')" :class="activeTab === 'lending' ? 'text-blue-600' : ''" class="flex flex-col items-center py-1">
-      <span class="text-base">🔄</span><span>Loans (<span x-text="activeLoans.length"></span>)</span>
+    <button @click="openScannerModal('home')" class="flex flex-col items-center py-1 text-blue-600">
+      <span class="text-base">📷</span><span>Scan QR</span>
     </button>
     <button @click="switchTab('archive')" :class="activeTab === 'archive' ? 'text-blue-600' : ''" class="flex flex-col items-center py-1">
       <span class="text-base">🏛️</span><span>Archive</span>
     </button>
+    <button x-show="isAdmin" @click="switchTab('lending')" :class="activeTab === 'lending' ? 'text-blue-600' : ''" class="flex flex-col items-center py-1">
+      <span class="text-base">🔄</span><span>Loans (<span x-text="activeLoans.length"></span>)</span>
+    </button>
     <button x-show="isAdmin" @click="switchTab('manage')" :class="activeTab === 'manage' ? 'text-blue-600' : ''" class="flex flex-col items-center py-1">
       <span class="text-base">⚙️</span><span>Manage</span>
     </button>
-    <button x-show="!isAdmin" @click="toggleHomeQrScanner()" class="flex flex-col items-center py-1 text-blue-600 col-span-2">
-      <span class="text-base">📷</span><span>Scan Book QR</span>
+    <button x-show="!isAdmin" @click="showDirectoryModal = true" class="flex flex-col items-center py-1">
+      <span class="text-base">🏷️</span><span>Authors</span>
+    </button>
+    <button x-show="!isAdmin" @click="showLoginModal = true" class="flex flex-col items-center py-1">
+      <span class="text-base">🔒</span><span>Staff</span>
     </button>
   </nav>
 
-  <!-- NON-INTRUSIVE SYNC INDICATOR -->
+  <!-- SYNC BANNER -->
   <div x-show="loading" x-cloak class="bg-blue-600 text-white text-xs font-medium text-center py-1.5 no-print">
     <span x-text="loadingText">Syncing...</span>
   </div>
@@ -133,22 +156,22 @@
   <main class="max-w-7xl w-full mx-auto px-4 py-6 flex-1">
 
     <!-- =================================================================== -->
-    <!-- TAB 1: FLAT CATALOG + QR SCANNER + 1-CLICK LEND / RETURN / EDIT     -->
+    <!-- TAB 1: CATALOG (CARD / DECK / LIST VIEWS — NO SHELF LOCATION SHOWN) -->
     <!-- =================================================================== -->
     <section x-show="activeTab === 'catalog'" x-cloak class="no-print space-y-5">
 
-      <!-- Search & Quick Filter Bar -->
+      <!-- Search, Filters & View Switcher Bar -->
       <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
           <!-- Search Input -->
-          <div class="md:col-span-5 relative">
-            <input type="text" x-model="searchQuery" placeholder="Search title (English / മലയാളം / العربية), author, ISBN..."
-                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:border-blue-500 focus:outline-none" />
+          <div class="md:col-span-5">
+            <input type="text" x-model="searchQuery" placeholder="Search title (English / മലയാളം / العربية), author, ISBN, Call No..."
+                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none" />
           </div>
 
           <!-- Language Dropdown -->
           <div class="md:col-span-2">
-            <select x-model="filterLanguage" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+            <select x-model="filterLanguage" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
               <option value="">All Languages</option>
               <template x-for="lang in configList('Language')" :key="lang">
                 <option :value="lang" x-text="lang"></option>
@@ -158,7 +181,7 @@
 
           <!-- Category Dropdown -->
           <div class="md:col-span-2">
-            <select x-model="filterCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+            <select x-model="filterCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
               <option value="">All Categories</option>
               <template x-for="cat in configList('Category_Genre')" :key="cat">
                 <option :value="cat" x-text="cat"></option>
@@ -166,46 +189,44 @@
             </select>
           </div>
 
-          <!-- Scan Book QR & Refresh -->
-          <div class="md:col-span-3 flex gap-2">
-            <button @click="toggleHomeQrScanner()"
-                    class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl py-2.5 px-3 transition flex items-center justify-center gap-1.5">
-              <span>📷</span>
-              <span x-text="homeScannerActive ? 'Close Camera' : 'Scan Book QR'"></span>
-            </button>
+          <!-- View Switcher (Card / Deck / List) & Index -->
+          <div class="md:col-span-3 flex items-center justify-between gap-1.5">
+            <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+              <button @click="setCatalogView('card')" :class="catalogViewMode === 'card' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'" class="px-2.5 py-1 rounded-lg transition" title="Card Grid View">
+                ⊞ Card
+              </button>
+              <button @click="setCatalogView('deck')" :class="catalogViewMode === 'deck' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'" class="px-2.5 py-1 rounded-lg transition" title="Deck Row View">
+                ▤ Deck
+              </button>
+              <button @click="setCatalogView('list')" :class="catalogViewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'" class="px-2.5 py-1 rounded-lg transition" title="Compact List Table">
+                ☰ List
+              </button>
+            </div>
+
             <button @click="showDirectoryModal = true" title="Browse Authors & Publishers"
-                    class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2.5 rounded-xl">
-              🏷️ Index
+                    class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-2.5 py-2 rounded-xl">
+              🏷️
             </button>
             <button @click="loadSnapshot()" title="Refresh"
-                    class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-2.5 rounded-xl">
+                    class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-2.5 py-2 rounded-xl">
               ↻
             </button>
           </div>
         </div>
 
-        <!-- Home Page Camera Box -->
-        <div x-show="homeScannerActive" x-cloak class="pt-3 border-t border-slate-100">
-          <div class="flex items-center justify-between text-xs text-slate-600 mb-2">
-            <span class="font-semibold text-blue-600">📷 Point camera at the book's QR sticker or ISBN barcode</span>
-            <button @click="stopAllScanners()" class="text-red-600 font-semibold">Close</button>
-          </div>
-          <div id="home-qr-reader" class="max-w-sm mx-auto rounded-xl overflow-hidden border border-slate-200"></div>
-        </div>
-
-        <!-- Active Filter Pills (When Author or Publisher is clicked) -->
+        <!-- Active Filter Pills -->
         <div x-show="activeAuthorFilter || activePublisherFilter || filterLanguage || filterCategory || searchQuery" x-cloak
              class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
-          <span class="text-slate-400 font-medium">Filtered by:</span>
+          <span class="text-slate-400 font-medium">Filtered (<span x-text="filteredCatalog.length"></span>):</span>
           <template x-if="activeAuthorFilter">
             <span class="bg-blue-50 text-blue-700 font-semibold px-3 py-1 rounded-full flex items-center gap-1.5">
-              ✍️ Author: <span x-text="activeAuthorFilter"></span>
+              ✍️ <span x-text="activeAuthorFilter"></span>
               <button @click="activeAuthorFilter = ''" class="hover:text-red-600">✕</button>
             </span>
           </template>
           <template x-if="activePublisherFilter">
             <span class="bg-purple-50 text-purple-700 font-semibold px-3 py-1 rounded-full flex items-center gap-1.5">
-              🏢 Publisher: <span x-text="activePublisherFilter"></span>
+              🏢 <span x-text="activePublisherFilter"></span>
               <button @click="activePublisherFilter = ''" class="hover:text-red-600">✕</button>
             </span>
           </template>
@@ -216,16 +237,18 @@
       <!-- Empty State -->
       <div x-show="filteredCatalog.length === 0 && !loading" class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
         <div class="text-4xl mb-2">📖</div>
-        <h3 class="font-bold text-slate-800 text-base">No books found</h3>
-        <p class="text-xs text-slate-500 mt-1">Try clearing your filters or click "+ Add Book" to catalog a new book.</p>
+        <h3 class="font-bold text-slate-800 text-base">No matching books</h3>
+        <p class="text-xs text-slate-500 mt-1">Clear your filters or click "+ Add Book" to catalog your collection.</p>
       </div>
 
-      <!-- FLAT BOOK CARDS GRID -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- ================================================================= -->
+      <!-- VIEW MODE 1: CARD GRID VIEW (NO SHELF LOCATION ON HOME PAGE)      -->
+      <!-- ================================================================= -->
+      <div x-show="catalogViewMode === 'card'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <template x-for="book in filteredCatalog" :key="book.Book_ID">
-          <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col justify-between hover:border-blue-300 transition">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col justify-between hover:border-blue-300 transition shadow-sm">
             <div>
-              <!-- Top Badges: Call Number & Status -->
+              <!-- Top Badges -->
               <div class="flex items-center justify-between gap-2 mb-3">
                 <span class="bg-slate-100 text-slate-700 font-mono text-[11px] font-semibold px-2.5 py-0.5 rounded-lg"
                       x-text="book.Call_Number || 'UNCL'"></span>
@@ -255,7 +278,7 @@
                   <p x-show="book.Series_Name" class="text-[11px] text-amber-700 font-medium mt-0.5"
                      x-text="book.Series_Name + (book.Volume_Number ? ' #' + book.Volume_Number : '')"></p>
 
-                  <!-- Clickable Author & Publisher Pills -->
+                  <!-- Clickable Author & Publisher -->
                   <div class="mt-2 space-y-0.5 text-xs">
                     <div>
                       <button @click.stop="filterByAuthor(book.Authors)" class="text-slate-600 hover:text-blue-600 font-medium truncate max-w-full text-left"
@@ -269,38 +292,31 @@
                 </div>
               </div>
 
-              <!-- Shelf Location & Current Borrower Info -->
+              <!-- Category & Active Borrower (Shelf Location Hidden on Home Page) -->
               <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <span class="truncate" x-text="'📍 ' + getPrimaryCopyLocation(book.Book_ID)"></span>
+                <span class="truncate" x-text="book.Category_Genre || book.Language || 'Book'"></span>
                 <span x-show="!isBookAvailable(book.Book_ID) && isAdmin" class="text-amber-700 font-semibold truncate ml-2"
                       x-text="'👤 ' + getActiveBorrowerName(book.Book_ID)"></span>
               </div>
             </div>
 
-            <!-- Direct Action Bar (Lend / Return / Edit / Details) -->
+            <!-- Action Buttons -->
             <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5">
-              <!-- Direct Lend Button -->
               <button x-show="isAdmin && isBookAvailable(book.Book_ID)"
                       @click="openQuickCheckoutModal(book)"
                       class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 px-2.5 rounded-lg transition">
                 📤 Lend
               </button>
-
-              <!-- Direct Return Button (if currently lent out) -->
               <button x-show="isAdmin && !isBookAvailable(book.Book_ID)"
                       @click="directReturnFromCard(book)"
                       class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold py-1.5 px-2.5 rounded-lg transition">
                 📥 Return
               </button>
-
-              <!-- Direct Edit Button -->
               <button x-show="isAdmin"
                       @click="openEditBookForm(book)"
                       class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-1.5 px-2.5 rounded-lg transition">
                 ✏️ Edit
               </button>
-
-              <!-- Details Button -->
               <button @click="openBookDetail(book)"
                       class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-1.5 px-2.5 rounded-lg transition"
                       :class="!isAdmin ? 'w-full' : ''">
@@ -310,23 +326,116 @@
           </div>
         </template>
       </div>
+
+      <!-- ================================================================= -->
+      <!-- VIEW MODE 2: DECK VIEW (HORIZONTAL COMPACT CARDS — NO LOCATION)   -->
+      <!-- ================================================================= -->
+      <div x-show="catalogViewMode === 'deck'" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <template x-for="book in filteredCatalog" :key="book.Book_ID">
+          <div class="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center justify-between gap-4 hover:border-blue-300 transition shadow-sm">
+            <div class="flex items-center gap-3.5 min-w-0 flex-1 cursor-pointer" @click="openBookDetail(book)">
+              <div class="w-14 h-20 rounded-xl bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                <template x-if="book.Cover_Image_URL">
+                  <img :src="book.Cover_Image_URL" class="w-full h-full object-cover" />
+                </template>
+                <template x-if="!book.Cover_Image_URL"><span class="text-xl">📘</span></template>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="font-mono text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold" x-text="book.Call_Number || 'UNCL'"></span>
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        :class="isBookAvailable(book.Book_ID) ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                        x-text="isBookAvailable(book.Book_ID) ? 'Available' : 'Lent Out'"></span>
+                </div>
+                <h3 class="font-bold text-slate-900 text-sm truncate" x-text="book.Title_English"></h3>
+                <p x-show="book.Title_Original" class="text-xs font-semibold text-blue-600 truncate" x-text="book.Title_Original"></p>
+                <p class="text-xs text-slate-500 truncate mt-0.5" x-text="book.Authors + (book.Publisher ? ' • ' + book.Publisher : '')"></p>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 flex-shrink-0">
+              <button x-show="isAdmin && isBookAvailable(book.Book_ID)" @click="openQuickCheckoutModal(book)"
+                      class="bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Lend</button>
+              <button x-show="isAdmin && !isBookAvailable(book.Book_ID)" @click="directReturnFromCard(book)"
+                      class="bg-amber-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Return</button>
+              <button x-show="isAdmin" @click="openEditBookForm(book)"
+                      class="bg-slate-100 text-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg">✏️</button>
+              <button @click="openBookDetail(book)"
+                      class="bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg">View</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- VIEW MODE 3: LIST TABLE VIEW (HIGH-DENSITY — NO LOCATION SHOWN)   -->
+      <!-- ================================================================= -->
+      <div x-show="catalogViewMode === 'list'" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
+              <tr>
+                <th class="p-3">Call No</th>
+                <th class="p-3">Book Title</th>
+                <th class="p-3">Author</th>
+                <th class="p-3">Publisher</th>
+                <th class="p-3">Category</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <template x-for="book in filteredCatalog" :key="book.Book_ID">
+                <tr class="hover:bg-slate-50/80">
+                  <td class="p-3 font-mono font-semibold text-slate-600" x-text="book.Call_Number || '—'"></td>
+                  <td class="p-3 cursor-pointer" @click="openBookDetail(book)">
+                    <div class="font-bold text-slate-900 text-sm" x-text="book.Title_English"></div>
+                    <div x-show="book.Title_Original" class="text-xs text-blue-600 font-medium" x-text="book.Title_Original"></div>
+                  </td>
+                  <td class="p-3">
+                    <button @click="filterByAuthor(book.Authors)" class="hover:text-blue-600 font-medium" x-text="book.Authors || '—'"></button>
+                  </td>
+                  <td class="p-3">
+                    <button @click="filterByPublisher(book.Publisher)" class="hover:text-purple-600 text-slate-500" x-text="book.Publisher || '—'"></button>
+                  </td>
+                  <td class="p-3 text-slate-500" x-text="book.Category_Genre || '—'"></td>
+                  <td class="p-3">
+                    <span class="px-2 py-0.5 rounded-full font-semibold text-[11px]"
+                          :class="isBookAvailable(book.Book_ID) ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                          x-text="isBookAvailable(book.Book_ID) ? 'Available' : 'Lent Out'"></span>
+                  </td>
+                  <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                    <button x-show="isAdmin && isBookAvailable(book.Book_ID)" @click="openQuickCheckoutModal(book)"
+                            class="bg-emerald-600 text-white font-semibold px-2.5 py-1 rounded-lg">Lend</button>
+                    <button x-show="isAdmin && !isBookAvailable(book.Book_ID)" @click="directReturnFromCard(book)"
+                            class="bg-amber-500 text-white font-semibold px-2.5 py-1 rounded-lg">Return</button>
+                    <button x-show="isAdmin" @click="openEditBookForm(book)"
+                            class="bg-slate-100 text-slate-700 font-semibold px-2 py-1 rounded-lg">✏️</button>
+                    <button @click="openBookDetail(book)"
+                            class="bg-slate-100 text-slate-700 font-semibold px-2.5 py-1 rounded-lg">Details</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- =================================================================== -->
-    <!-- TAB 2: ACTIVE LOANS & LENDING DESK                                  -->
+    <!-- TAB 2: ACTIVE LOANS & COMPLETE TRANSACTION HISTORY                  -->
     <!-- =================================================================== -->
     <section x-show="activeTab === 'lending'" x-cloak class="no-print space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        <!-- Left Card: Manual or QR Check-Out -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+        <!-- Left Card: Issue a Book -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3 h-fit">
           <div class="flex items-center justify-between">
             <h2 class="font-bold text-slate-900 text-base">📤 Lend a Book</h2>
-            <button @click="startDeskScanner('checkout')" class="bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-lg">
-              📷 Scan QR
+            <button @click="openScannerModal('checkout')" class="bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1.5 rounded-lg">
+              📷 Scan Copy QR
             </button>
           </div>
-          <div id="desk-scanner-checkout" class="rounded-xl overflow-hidden" x-show="deskScannerMode === 'checkout'"></div>
 
           <div class="space-y-3 text-xs">
             <div>
@@ -364,11 +473,20 @@
           </div>
         </div>
 
-        <!-- Right 2 Columns: Currently Borrowed Books Table -->
-        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 class="font-bold text-slate-900 text-base">📋 Currently Borrowed Books (<span x-text="activeLoans.length"></span>)</h2>
-            <div class="flex items-center gap-2 text-xs">
+        <!-- Right 2 Columns: Active Loans & Complete Transaction History -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <!-- Toggle: Active Loans vs All Transaction History -->
+            <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+              <button @click="loanSubTab = 'active'" :class="loanSubTab === 'active' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'" class="px-3.5 py-1.5 rounded-lg">
+                📋 Active Loans (<span x-text="activeLoans.length"></span>)
+              </button>
+              <button @click="loanSubTab = 'history'" :class="loanSubTab === 'history' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'" class="px-3.5 py-1.5 rounded-lg">
+                📜 Full Transaction History (<span x-text="transactions.length"></span>)
+              </button>
+            </div>
+
+            <div x-show="loanSubTab === 'active'" class="flex items-center gap-2 text-xs">
               <span class="text-slate-500">WhatsApp Template:</span>
               <select x-model="selectedWaTemplateKey" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-semibold">
                 <template x-for="tpl in whatsappTemplates" :key="tpl.Config_Key">
@@ -378,13 +496,14 @@
             </div>
           </div>
 
-          <div class="overflow-x-auto">
+          <!-- SUB-VIEW A: ACTIVE LOANS TABLE -->
+          <div x-show="loanSubTab === 'active'" class="overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50 text-slate-500 uppercase">
                 <tr>
                   <th class="p-3 rounded-l-lg">Book Title & Copy</th>
                   <th class="p-3">Borrower</th>
-                  <th class="p-3">Due Date</th>
+                  <th class="p-3">Issued → Due</th>
                   <th class="p-3 text-right rounded-r-lg">Quick Actions</th>
                 </tr>
               </thead>
@@ -397,11 +516,12 @@
                     </td>
                     <td class="p-3 font-medium text-slate-800" x-text="t.Member_Name"></td>
                     <td class="p-3">
-                      <span class="px-2.5 py-1 rounded-full font-semibold"
+                      <div class="text-[11px] text-slate-400" x-text="'Out: ' + String(t.Issue_Date).substring(0,10)"></div>
+                      <span class="px-2 py-0.5 rounded-full font-semibold text-[11px]"
                             :class="isOverdue(t.Due_Date) ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-700'"
-                            x-text="String(t.Due_Date).substring(0,10)"></span>
+                            x-text="'Due: ' + String(t.Due_Date).substring(0,10)"></span>
                     </td>
-                    <td class="p-3 text-right space-x-1">
+                    <td class="p-3 text-right space-x-1 whitespace-nowrap">
                       <button @click="sendCustomWhatsApp(t)" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold px-2.5 py-1.5 rounded-lg">
                         💬 WhatsApp
                       </button>
@@ -419,6 +539,45 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- SUB-VIEW B: COMPLETE TRANSACTION HISTORY LOG -->
+          <div x-show="loanSubTab === 'history'" class="space-y-3">
+            <input type="text" x-model="txnSearchQuery" placeholder="Filter history by book title, borrower name, or accession number..."
+                   class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs" />
+            <div class="overflow-x-auto max-h-[60vh]">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 uppercase sticky top-0">
+                  <tr>
+                    <th class="p-2.5">Book & Copy</th>
+                    <th class="p-2.5">Borrower</th>
+                    <th class="p-2.5">Issued</th>
+                    <th class="p-2.5">Due</th>
+                    <th class="p-2.5">Returned</th>
+                    <th class="p-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <template x-for="t in filteredTransactionsHistory" :key="t.Txn_ID">
+                    <tr>
+                      <td class="p-2.5">
+                        <div class="font-bold text-slate-800" x-text="t.Book_Title"></div>
+                        <div class="font-mono text-[10px] text-slate-400" x-text="t.Accession_Number"></div>
+                      </td>
+                      <td class="p-2.5 font-medium" x-text="t.Member_Name"></td>
+                      <td class="p-2.5 font-mono text-[11px]" x-text="String(t.Issue_Date).substring(0,10)"></td>
+                      <td class="p-2.5 font-mono text-[11px]" x-text="String(t.Due_Date).substring(0,10)"></td>
+                      <td class="p-2.5 font-mono text-[11px]" x-text="t.Return_Date ? String(t.Return_Date).substring(0,10) : '—'"></td>
+                      <td class="p-2.5">
+                        <span class="px-2 py-0.5 rounded-full font-semibold text-[10px]"
+                              :class="t.Status === 'Returned' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                              x-text="t.Status"></span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -466,24 +625,166 @@
     </section>
 
     <!-- =================================================================== -->
-    <!-- TAB 4: MANAGE (MEMBERS, MINIMALIST STICKERS & WHATSAPP TEMPLATES)   -->
+    <!-- TAB 4: MANAGE (STICKERS, PROFILE BRANDING, EXPORT, MEMBERS, WA)     -->
     <!-- =================================================================== -->
     <section x-show="activeTab === 'manage'" x-cloak class="space-y-6">
 
       <!-- Sub-navigation for Manage Tab -->
       <div class="flex flex-wrap gap-2 no-print">
+        <button @click="manageSection = 'stickers'; $nextTick(() => renderSmallStickers())" :class="manageSection === 'stickers' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold">
+          🏷️ Space-Saving Stickers (<span x-text="copies.length"></span>)
+        </button>
+        <button @click="manageSection = 'branding'" :class="manageSection === 'branding' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold">
+          🎨 Library Profile & Name
+        </button>
+        <button @click="manageSection = 'export'" :class="manageSection === 'export' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold">
+          📥 Export Catalog & Data
+        </button>
         <button @click="manageSection = 'members'" :class="manageSection === 'members' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold">
           👥 Members (<span x-text="members.length"></span>)
-        </button>
-        <button @click="manageSection = 'stickers'; $nextTick(() => renderSmallStickers())" :class="manageSection === 'stickers' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold">
-          🏷️ Printable QR Stickers (<span x-text="copies.length"></span>)
         </button>
         <button @click="manageSection = 'templates'" :class="manageSection === 'templates' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200'" class="px-4 py-2 rounded-xl text-xs font-semibold">
           💬 WhatsApp Templates
         </button>
       </div>
 
-      <!-- 4A: MEMBERS -->
+      <!-- 4A: ULTRA SPACE-SAVING STICKER PRINTER (MAXIMUM PER A4 PAGE) -->
+      <div x-show="manageSection === 'stickers'">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 mb-5 flex flex-wrap items-center justify-between gap-4 no-print">
+          <div>
+            <h3 class="font-bold text-base text-slate-900">🏷️ Space-Saving Spine & QR Stickers</h3>
+            <p class="text-xs text-slate-500">Zero-waste A4 layout (3mm page margins) containing only Call Number, QR Code, and Accession Number.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <select x-model="stickerDensity" @change="$nextTick(() => renderSmallStickers())" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold">
+              <option value="ultra">Ultra-Compact (8 per row • ~88/page)</option>
+              <option value="compact">Compact (6 per row • ~54/page)</option>
+              <option value="standard">Standard (4 per row • ~32/page)</option>
+            </select>
+            <button @click="renderSmallStickers()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-xl">
+              ↻ Refresh QR
+            </button>
+            <button @click="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-xl">
+              🖨️ Print Sheet
+            </button>
+          </div>
+        </div>
+
+        <!-- PRINTABLE ULTRA-DENSE STICKER SHEET -->
+        <div id="printable-stickers"
+             class="grid"
+             :class="{
+               'grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1': stickerDensity === 'ultra',
+               'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5': stickerDensity === 'compact',
+               'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2': stickerDensity === 'standard'
+             }">
+          <template x-for="copy in copies" :key="copy.Accession_Number">
+            <div class="mini-sticker bg-white p-1 flex flex-col items-center justify-center text-center overflow-hidden">
+              <div class="font-mono font-bold text-[8.5px] leading-none text-black tracking-tighter truncate w-full" x-text="copy.Call_Number"></div>
+              <div class="my-0.5 flex items-center justify-center" :id="'mini-qr-' + copy.Accession_Number"></div>
+              <div class="font-mono font-extrabold text-[9px] leading-none text-black tracking-tight" x-text="copy.Accession_Number"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 4B: CUSTOM LIBRARY PROFILE PICTURE & NAME -->
+      <div x-show="manageSection === 'branding'" class="bg-white rounded-2xl border border-slate-200 p-6 no-print max-w-xl space-y-4">
+        <div>
+          <h3 class="font-bold text-base text-slate-900">🎨 Library Profile Picture & Name</h3>
+          <p class="text-xs text-slate-500">Customize your library's header name, tagline, and profile logo across all devices.</p>
+        </div>
+
+        <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div class="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl font-bold overflow-hidden border border-slate-300 flex-shrink-0">
+            <template x-if="libraryLogo">
+              <img :src="libraryLogo" class="w-full h-full object-cover" />
+            </template>
+            <template x-if="!libraryLogo"><span>📚</span></template>
+          </div>
+          <div class="space-y-1.5 text-xs">
+            <label class="cursor-pointer inline-block bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold px-3 py-1.5 rounded-lg">
+              📷 Upload New Profile Picture
+              <input type="file" accept="image/*" @change="handleLogoUpload($event)" class="hidden" />
+            </label>
+            <button x-show="libraryLogo" @click="libraryLogo = ''" class="block text-red-600 hover:underline text-[11px]">Remove Picture</button>
+          </div>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Library Name</label>
+            <input type="text" x-model="libraryName" placeholder="e.g. SKD Home Library" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-semibold" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Library Subtitle / Tagline</label>
+            <input type="text" x-model="libraryTagline" placeholder="e.g. Personal Collection & Digital Archive" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Or Paste Profile Image URL</label>
+            <input type="url" x-model="libraryLogo" placeholder="https://..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono" />
+          </div>
+          <button @click="saveLibraryBranding()" :disabled="loading" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-xs">
+            💾 Save Library Profile
+          </button>
+        </div>
+      </div>
+
+      <!-- 4C: EXPORT CATALOG & DATA -->
+      <div x-show="manageSection === 'export'" class="bg-white rounded-2xl border border-slate-200 p-6 no-print space-y-4">
+        <div>
+          <h3 class="font-bold text-base text-slate-900">📥 Export Book Catalog & Library Data</h3>
+          <p class="text-xs text-slate-500">Download clean CSV spreadsheets (for Excel / Google Sheets) or a full JSON backup of your database.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          <div class="border border-slate-200 rounded-xl p-4 flex flex-col justify-between bg-slate-50">
+            <div>
+              <div class="text-xl mb-1">📚</div>
+              <h4 class="font-bold text-slate-900 text-sm">Book Catalog (CSV)</h4>
+              <p class="text-slate-500 mt-1">All <span x-text="catalog.length"></span> titles with 24 metadata fields, ISBNs, and Call Numbers.</p>
+            </div>
+            <button @click="exportTableToCSV(catalog, 'Library_Catalog')" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg">
+              Download Catalog CSV
+            </button>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl p-4 flex flex-col justify-between bg-slate-50">
+            <div>
+              <div class="text-xl mb-1">🏷️</div>
+              <h4 class="font-bold text-slate-900 text-sm">Physical Copies (CSV)</h4>
+              <p class="text-slate-500 mt-1">All <span x-text="copies.length"></span> accession numbers, shelf locations, prices, and statuses.</p>
+            </div>
+            <button @click="exportTableToCSV(copies, 'Library_Physical_Copies')" class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 rounded-lg">
+              Download Copies CSV
+            </button>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl p-4 flex flex-col justify-between bg-slate-50">
+            <div>
+              <div class="text-xl mb-1">📜</div>
+              <h4 class="font-bold text-slate-900 text-sm">Transactions Log (CSV)</h4>
+              <p class="text-slate-500 mt-1">All <span x-text="transactions.length"></span> lending and return records with borrower details.</p>
+            </div>
+            <button @click="exportTableToCSV(transactions, 'Library_Transactions_History')" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg">
+              Download History CSV
+            </button>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl p-4 flex flex-col justify-between bg-slate-50">
+            <div>
+              <div class="text-xl mb-1">📦</div>
+              <h4 class="font-bold text-slate-900 text-sm">Full Backup (JSON)</h4>
+              <p class="text-slate-500 mt-1">Complete snapshot of catalog, copies, members, and archive links.</p>
+            </div>
+            <button @click="exportFullJsonBackup()" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg">
+              Download JSON Backup
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4D: MEMBERS -->
       <div x-show="manageSection === 'members'" class="bg-white rounded-2xl border border-slate-200 p-5 no-print">
         <h3 class="font-bold text-base text-slate-900 mb-3">👥 Library Members / Borrowers</h3>
         <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 mb-5 text-xs">
@@ -512,35 +813,7 @@
         </div>
       </div>
 
-      <!-- 4B: MINIMALIST SMALL STICKERS (QR + CALL NO + ACCESSION NO ONLY) -->
-      <div x-show="manageSection === 'stickers'">
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 mb-5 flex flex-wrap items-center justify-between gap-4 no-print">
-          <div>
-            <h3 class="font-bold text-base text-slate-900">🏷️ Minimalist Spine & QR Stickers</h3>
-            <p class="text-xs text-slate-500">Compact layout containing Call Number, QR Code, and Accession Number only.</p>
-          </div>
-          <div class="flex gap-2">
-            <button @click="renderSmallStickers()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-xl">
-              ↻ Generate QR
-            </button>
-            <button @click="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-5 py-2 rounded-xl">
-              🖨️ Print Stickers
-            </button>
-          </div>
-        </div>
-
-        <div id="printable-stickers" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
-          <template x-for="copy in copies" :key="copy.Accession_Number">
-            <div class="mini-sticker bg-white rounded-lg border border-slate-300 p-2 flex flex-col items-center justify-center text-center">
-              <div class="font-mono font-bold text-[10px] leading-tight text-slate-900 break-all" x-text="copy.Call_Number"></div>
-              <div class="my-1.5 flex items-center justify-center" :id="'mini-qr-' + copy.Accession_Number"></div>
-              <div class="font-mono font-extrabold text-[11px] text-slate-900" x-text="copy.Accession_Number"></div>
-            </div>
-          </template>
-        </div>
-      </div>
-
-      <!-- 4C: WHATSAPP TEMPLATES -->
+      <!-- 4E: WHATSAPP TEMPLATES -->
       <div x-show="manageSection === 'templates'" class="bg-white rounded-2xl border border-slate-200 p-5 no-print space-y-4">
         <div>
           <h3 class="font-bold text-base text-slate-900">💬 Custom WhatsApp Templates</h3>
@@ -581,11 +854,10 @@
             <label class="block text-[11px] font-semibold text-slate-600 mb-1">ISBN Barcode</label>
             <div class="flex gap-1.5">
               <input type="text" x-model="formBook.ISBN" placeholder="ISBN..." class="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono" />
-              <button type="button" @click="rescanIsbn()" class="bg-blue-600 text-white text-xs font-semibold px-2.5 py-1.5 rounded-xl whitespace-nowrap">
+              <button type="button" @click="openScannerModal('isbn')" class="bg-blue-600 text-white text-xs font-semibold px-2.5 py-1.5 rounded-xl whitespace-nowrap">
                 📷 Scan
               </button>
             </div>
-            <div id="form-isbn-reader" class="mt-2 rounded-xl overflow-hidden" x-show="formScannerActive"></div>
           </div>
 
           <div>
@@ -687,7 +959,7 @@
           </div>
         </div>
 
-        <!-- COLLAPSIBLE ACCORDION FOR REMAINING FIELDS (SERIES, PAGES, PRICE, BLURB, PDF) -->
+        <!-- COLLAPSIBLE ACCORDION FOR REMAINING FIELDS -->
         <div class="border-t border-slate-100 pt-4">
           <button type="button" @click="showExtraFields = !showExtraFields"
                   class="text-xs font-semibold text-blue-600 flex items-center gap-1">
@@ -791,12 +1063,18 @@
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
-          <button type="button" @click="switchTab('catalog')" class="bg-slate-100 text-slate-700 font-semibold text-xs px-5 py-2.5 rounded-xl">Cancel</button>
-          <button type="button" @click="saveBookRecord()" :disabled="loading"
-                  class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-6 py-2.5 rounded-xl transition">
-            💾 Save Book
-          </button>
+        <div class="flex justify-between items-center pt-4 border-t border-slate-100">
+          <div>
+            <button x-show="formBook.isEditMode" type="button" @click="deleteBook(formBook.Book_ID)"
+                    class="text-red-600 hover:underline text-xs font-semibold">🗑️ Delete Book</button>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" @click="switchTab('catalog')" class="bg-slate-100 text-slate-700 font-semibold text-xs px-5 py-2.5 rounded-xl">Cancel</button>
+            <button type="button" @click="saveBookRecord()" :disabled="loading"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-6 py-2.5 rounded-xl transition">
+              💾 Save Book
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -804,7 +1082,40 @@
   </main>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 1: FIXED DIRECT QUICK-LEND MODAL (WITH INLINE NEW BORROWER)     -->
+  <!-- MODAL 0: UNIVERSAL MOBILE-FIXED QR & BARCODE SCANNER MODAL            -->
+  <!-- ===================================================================== -->
+  <div x-show="showScannerModal" x-cloak class="fixed inset-0 bg-slate-900/75 flex items-center justify-center p-4 z-50 no-print">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl space-y-4" @click.away="closeScannerModal()">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">📷 Scan QR Code or Barcode</h3>
+          <p class="text-[11px] text-slate-500" x-text="scannerTarget === 'home' ? 'Point at book sticker QR or ISBN barcode' : 'Point camera at code'"></p>
+        </div>
+        <button @click="closeScannerModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+
+      <!-- Live Camera Viewport -->
+      <div id="universal-qr-reader" class="w-full min-h-[240px] bg-slate-950 rounded-xl overflow-hidden border border-slate-200"></div>
+
+      <!-- Fallback Native Camera Snapshot Scanner + Manual Entry -->
+      <div class="space-y-2 pt-1 border-t border-slate-100 text-xs">
+        <label class="cursor-pointer w-full block bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-center py-2 rounded-xl transition">
+          📸 Camera Not Focusing? Snap Photo to Scan
+          <input type="file" accept="image/*" capture="environment" @change="scanQrFromPhotoFile($event)" class="hidden" />
+        </label>
+
+        <div class="flex gap-1.5">
+          <input type="text" x-model="manualScanInput" @keyup.enter="handleDecodedScan(manualScanInput)"
+                 placeholder="Or type Accession (LIB-01001) / ISBN..."
+                 class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono" />
+          <button @click="handleDecodedScan(manualScanInput)" class="bg-slate-900 text-white font-semibold px-3 py-1.5 rounded-xl">Go</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: DIRECT QUICK-LEND MODAL                                      -->
   <!-- ===================================================================== -->
   <div x-show="quickCheckoutBook" x-cloak class="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 no-print">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4" @click.away="quickCheckoutBook = null">
@@ -817,14 +1128,12 @@
       </div>
 
       <div class="space-y-3 text-xs">
-        <!-- Copy Selector -->
         <div>
           <label class="block font-semibold text-slate-600 mb-1">Copy Accession Number</label>
           <input type="text" x-model="checkoutForm.Accession_Number" readonly
                  class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 font-mono font-bold text-slate-700" />
         </div>
 
-        <!-- Toggle between Existing Member vs Quick New Member -->
         <div>
           <div class="flex items-center justify-between mb-1">
             <label class="font-semibold text-slate-600">Who is borrowing this book? *</label>
@@ -833,7 +1142,6 @@
             </button>
           </div>
 
-          <!-- Option A: Existing Member Dropdown -->
           <div x-show="!quickNewMemberMode">
             <select x-model="checkoutForm.Member_ID" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
               <option value="">-- Select Member --</option>
@@ -843,7 +1151,6 @@
             </select>
           </div>
 
-          <!-- Option B: Inline New Borrower Inputs -->
           <div x-show="quickNewMemberMode" class="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
             <input type="text" x-model="quickMemberName" placeholder="New Borrower's Full Name *" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm" />
             <input type="text" x-model="quickMemberPhone" placeholder="WhatsApp Number (e.g. 919876543210)" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono" />
@@ -873,7 +1180,7 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- MODAL 2: BOOK DETAILS MODAL                                           -->
+  <!-- MODAL 2: BOOK DETAILS + SHELF LOCATION + BOOK TRANSACTION HISTORY     -->
   <!-- ===================================================================== -->
   <div x-show="selectedBook" x-cloak class="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-40 no-print">
     <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl" @click.away="selectedBook = null">
@@ -881,7 +1188,10 @@
         <div class="space-y-4">
           <div class="flex justify-between items-start gap-4">
             <div>
-              <span class="bg-slate-100 text-slate-700 font-mono text-xs font-semibold px-2.5 py-1 rounded-lg" x-text="selectedBook.Call_Number"></span>
+              <div class="flex items-center gap-2">
+                <span class="bg-slate-100 text-slate-700 font-mono text-xs font-semibold px-2.5 py-1 rounded-lg" x-text="selectedBook.Call_Number"></span>
+                <span class="bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg" x-text="selectedBook.Reading_Status || 'Unread'"></span>
+              </div>
               <h2 class="font-bold text-xl text-slate-900 mt-2" x-text="selectedBook.Title_English"></h2>
               <p x-show="selectedBook.Title_Original" class="text-base font-semibold text-blue-600" x-text="selectedBook.Title_Original"></p>
             </div>
@@ -916,10 +1226,10 @@
             </div>
           </div>
 
-          <!-- Copies List -->
+          <!-- Physical Copies & Shelf Location (Shown inside Details Modal) -->
           <div class="border-t border-slate-100 pt-4">
             <div class="flex justify-between items-center mb-2">
-              <span class="text-xs font-bold text-slate-500 uppercase">Physical Copies</span>
+              <span class="text-xs font-bold text-slate-500 uppercase">Physical Copies & Shelf Location</span>
               <div class="flex gap-2" x-show="isAdmin">
                 <button @click="addDuplicateCopy(selectedBook)" class="bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1 rounded-lg">+ Add Copy</button>
                 <button @click="openEditBookForm(selectedBook); selectedBook = null" class="bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-lg">✏️ Edit</button>
@@ -930,13 +1240,51 @@
                 <div class="bg-slate-50 rounded-xl p-2.5 flex items-center justify-between">
                   <div>
                     <span class="font-mono font-bold text-slate-900" x-text="c.Accession_Number"></span>
-                    <span class="text-slate-500 ml-2" x-text="c.Shelf_Location"></span>
+                    <span class="text-slate-500 ml-2" x-text="'📍 ' + c.Shelf_Location"></span>
                   </div>
                   <span class="font-semibold px-2.5 py-0.5 rounded-full"
                         :class="c.Status === 'Available' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
                         x-text="c.Status"></span>
                 </div>
               </template>
+            </div>
+          </div>
+
+          <!-- BOOK TRANSACTION HISTORY -->
+          <div x-show="isAdmin" class="border-t border-slate-100 pt-4">
+            <span class="text-xs font-bold text-slate-500 uppercase block mb-2">
+              📜 Lending & Transaction History (<span x-text="getBookTransactions(selectedBook.Book_ID).length"></span>)
+            </span>
+            <div x-show="getBookTransactions(selectedBook.Book_ID).length === 0" class="text-xs text-slate-400 bg-slate-50 p-3 rounded-xl text-center">
+              This book has not been lent out yet.
+            </div>
+            <div x-show="getBookTransactions(selectedBook.Book_ID).length > 0" class="overflow-x-auto border border-slate-100 rounded-xl">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th class="p-2">Copy</th>
+                    <th class="p-2">Borrower</th>
+                    <th class="p-2">Issued</th>
+                    <th class="p-2">Returned</th>
+                    <th class="p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <template x-for="t in getBookTransactions(selectedBook.Book_ID)" :key="t.Txn_ID">
+                    <tr>
+                      <td class="p-2 font-mono" x-text="t.Accession_Number"></td>
+                      <td class="p-2 font-semibold" x-text="t.Member_Name"></td>
+                      <td class="p-2 font-mono text-[11px]" x-text="String(t.Issue_Date).substring(0,10)"></td>
+                      <td class="p-2 font-mono text-[11px]" x-text="t.Return_Date ? String(t.Return_Date).substring(0,10) : 'Still Out'"></td>
+                      <td class="p-2">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              :class="t.Status === 'Returned' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                              x-text="t.Status"></span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1052,8 +1400,17 @@
         adminPin: sessionStorage.getItem('LMS_ADMIN_PIN') || '',
         get isAdmin() { return Boolean(this.adminPin && this.adminPin.trim().length > 0); },
 
+        // Custom Library Branding
+        libraryName: localStorage.getItem('LMS_BRAND_NAME') || 'SKD Home Library',
+        libraryTagline: localStorage.getItem('LMS_BRAND_TAGLINE') || 'Personal Collection & Archive',
+        libraryLogo: localStorage.getItem('LMS_BRAND_LOGO') || '',
+
+        // View & Navigation States
         activeTab: 'catalog',
-        manageSection: 'members',
+        catalogViewMode: localStorage.getItem('LMS_VIEW_MODE') || 'card',
+        loanSubTab: 'active',
+        manageSection: 'stickers',
+        stickerDensity: 'ultra',
         showExtraFields: false,
         loading: false,
         loadingText: 'Syncing...',
@@ -1062,6 +1419,7 @@
         showDirectoryModal: false,
         installPromptEvent: null,
 
+        // Data Tables
         catalog: [],
         copies: [],
         configs: [],
@@ -1071,12 +1429,15 @@
         members: [],
         transactions: [],
 
+        // Filters
         searchQuery: '',
+        txnSearchQuery: '',
         filterLanguage: '',
         filterCategory: '',
         activeAuthorFilter: '',
         activePublisherFilter: '',
 
+        // Modals
         selectedBook: null,
         quickCheckoutBook: null,
         quickNewMemberMode: false,
@@ -1086,11 +1447,13 @@
         activePdfTitle: '',
         selectedWaTemplateKey: 'Book_Taken_Update',
 
+        // Universal Mobile-Safe QR Scanner Modal
+        showScannerModal: false,
+        scannerTarget: 'home', // 'home' | 'isbn' | 'checkout'
+        manualScanInput: '',
         qrInstance: null,
-        homeScannerActive: false,
-        formScannerActive: false,
-        deskScannerMode: '',
 
+        // Forms
         formBook: {},
         checkoutForm: { Accession_Number: '', Member_ID: '', Loan_Days: 14, Notes: '' },
         checkinForm: { Accession_Number: '', Return_Condition: 'Good', Notes: '' },
@@ -1125,9 +1488,17 @@
           else this.loadSnapshot();
         },
 
+        setCatalogView(mode) {
+          this.catalogViewMode = mode;
+          localStorage.setItem('LMS_VIEW_MODE', mode);
+        },
+
         switchTab(tab) {
-          this.stopAllScanners();
+          this.closeScannerModal();
           this.activeTab = tab;
+          if (tab === 'manage' && this.manageSection === 'stickers') {
+            this.$nextTick(() => this.renderSmallStickers());
+          }
         },
 
         async installPWA() {
@@ -1161,6 +1532,23 @@
               this.digitalArchive = out.digitalArchive || [];
               this.members = out.members || [];
               this.transactions = out.transactions || [];
+
+              // Load synced Library Branding if stored in 3_System_Configs
+              const brandName = this.configs.find(c => c.Config_ID === 'CFG-BRAND-NAME');
+              const brandTag = this.configs.find(c => c.Config_ID === 'CFG-BRAND-TAGLINE');
+              const brandLogo = this.configs.find(c => c.Config_ID === 'CFG-BRAND-LOGO');
+              if (brandName && brandName.Config_Value) {
+                this.libraryName = brandName.Config_Value;
+                localStorage.setItem('LMS_BRAND_NAME', this.libraryName);
+              }
+              if (brandTag && brandTag.Config_Value) {
+                this.libraryTagline = brandTag.Config_Value;
+                localStorage.setItem('LMS_BRAND_TAGLINE', this.libraryTagline);
+              }
+              if (brandLogo && brandLogo.Config_Value !== undefined) {
+                this.libraryLogo = brandLogo.Config_Value;
+                localStorage.setItem('LMS_BRAND_LOGO', this.libraryLogo);
+              }
             }
           } catch (e) {
             alert('Connection error. Please verify your Apps Script URL.');
@@ -1169,9 +1557,171 @@
           }
         },
 
+        // ===================================================================
+        // CUSTOM LIBRARY PROFILE PICTURE & NAME SAVER
+        // ===================================================================
+        handleLogoUpload(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const size = 160;
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const minSide = Math.min(img.width, img.height);
+              const sx = (img.width - minSide) / 2;
+              const sy = (img.height - minSide) / 2;
+              ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+              this.libraryLogo = canvas.toDataURL('image/jpeg', 0.82);
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        async saveLibraryBranding() {
+          localStorage.setItem('LMS_BRAND_NAME', this.libraryName);
+          localStorage.setItem('LMS_BRAND_TAGLINE', this.libraryTagline);
+          localStorage.setItem('LMS_BRAND_LOGO', this.libraryLogo);
+
+          this.loading = true;
+          this.loadingText = 'Saving library profile...';
+          try {
+            const items = [
+              { Config_ID: 'CFG-BRAND-NAME', Config_Type: 'Branding', Config_Key: 'Library_Name', Config_Value: this.libraryName },
+              { Config_ID: 'CFG-BRAND-TAGLINE', Config_Type: 'Branding', Config_Key: 'Library_Tagline', Config_Value: this.libraryTagline },
+              { Config_ID: 'CFG-BRAND-LOGO', Config_Type: 'Branding', Config_Key: 'Library_Logo', Config_Value: this.libraryLogo }
+            ];
+            for (const item of items) {
+              await fetch(this.apiUrl, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'saveSystemConfig', pin: this.adminPin, data: item })
+              });
+            }
+            alert('Library profile updated!');
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        // ===================================================================
+        // FIXED MOBILE-SAFE QR & BARCODE SCANNER (LIVE CAMERA + PHOTO FALLBACK)
+        // ===================================================================
+        openScannerModal(targetMode) {
+          this.scannerTarget = targetMode || 'home';
+          this.manualScanInput = '';
+          this.showScannerModal = true;
+
+          // Wait 200ms so mobile DOM finishes rendering the modal width before starting camera
+          setTimeout(() => {
+            const readerEl = document.getElementById('universal-qr-reader');
+            if (!readerEl) return;
+            readerEl.innerHTML = '';
+            this.qrInstance = new Html5Qrcode('universal-qr-reader');
+
+            this.qrInstance.start(
+              { facingMode: "environment" },
+              {
+                fps: 10,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                  const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                  const boxSize = Math.max(150, Math.floor(minEdge * 0.75));
+                  return { width: boxSize, height: boxSize };
+                }
+              },
+              (decodedText) => {
+                this.handleDecodedScan(decodedText);
+              },
+              () => {}
+            ).catch(() => {
+              // If live video stream is blocked, user can still use the Photo Snapshot button below
+            });
+          }, 200);
+        },
+
+        async scanQrFromPhotoFile(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          this.loading = true;
+          this.loadingText = 'Decoding QR / Barcode from photo...';
+          try {
+            if (this.qrInstance) {
+              try { await this.qrInstance.stop(); } catch (e) {}
+            } else {
+              this.qrInstance = new Html5Qrcode('universal-qr-reader');
+            }
+            const decodedText = await this.qrInstance.scanFile(file, true);
+            this.handleDecodedScan(decodedText);
+          } catch (err) {
+            alert('Could not detect a clear QR or barcode in that photo. Try moving slightly further back for sharper focus.');
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        handleDecodedScan(rawText) {
+          const code = String(rawText || '').trim();
+          if (!code) return;
+          this.closeScannerModal();
+
+          if (this.scannerTarget === 'isbn') {
+            this.formBook.ISBN = code;
+            this.runAiPipeline();
+            return;
+          }
+
+          if (this.scannerTarget === 'checkout') {
+            this.checkoutForm.Accession_Number = code.toUpperCase();
+            return;
+          }
+
+          // Default 'home' target: Find book by Copy Accession_Number OR by ISBN and open Book Details
+          const cleanIsbn = code.replace(/[^0-9X]/gi, '');
+          const copyMatch = this.copies.find(c => String(c.Accession_Number).toUpperCase() === code.toUpperCase());
+          if (copyMatch) {
+            const parentBook = this.catalog.find(b => String(b.Book_ID) === String(copyMatch.Book_ID));
+            if (parentBook) {
+              this.openBookDetail(parentBook);
+              return;
+            }
+          }
+          const isbnMatch = this.catalog.find(b => cleanIsbn && String(b.ISBN).replace(/[^0-9X]/gi, '') === cleanIsbn);
+          if (isbnMatch) {
+            this.openBookDetail(isbnMatch);
+          } else {
+            alert(`No book found in catalog matching code: "${code}"`);
+          }
+        },
+
+        closeScannerModal() {
+          if (this.qrInstance) {
+            this.qrInstance.stop().then(() => {
+              this.qrInstance.clear();
+              this.qrInstance = null;
+              this.showScannerModal = false;
+            }).catch(() => {
+              this.qrInstance = null;
+              this.showScannerModal = false;
+            });
+          } else {
+            this.showScannerModal = false;
+          }
+        },
+
+        // ===================================================================
+        // HELPERS, FILTERS & TRANSACTION HISTORY
+        // ===================================================================
         configList(type) {
           const items = this.configs.filter(c => c.Config_Type === type).map(c => c.Config_Value);
-          return items.length ? items : ['General'];
+          if (items.length) return items;
+          if (type === 'Language') return ['English', 'Malayalam (മലയാളം)', 'Arabic (العربية)', 'Hindi (हिन्दी)'];
+          if (type === 'Category_Genre') return ['Fiction & Literature', 'History & Sociology', 'Religion & Philosophy', 'Science & Technology'];
+          if (type === 'Shelf_Location') return ['Main Room - Shelf A - Row 1', 'Main Room - Shelf B - Row 1'];
+          return ['General'];
         },
 
         get whatsappTemplates() {
@@ -1184,6 +1734,21 @@
 
         get activeLoans() {
           return this.transactions.filter(t => t.Status === 'Active' || t.Status === 'Overdue');
+        },
+
+        get filteredTransactionsHistory() {
+          const q = this.txnSearchQuery.toLowerCase().trim();
+          const list = [...this.transactions].reverse();
+          if (!q) return list;
+          return list.filter(t =>
+            String(t.Book_Title || '').toLowerCase().includes(q) ||
+            String(t.Member_Name || '').toLowerCase().includes(q) ||
+            String(t.Accession_Number || '').toLowerCase().includes(q)
+          );
+        },
+
+        getBookTransactions(bookId) {
+          return this.transactions.filter(t => String(t.Book_ID) === String(bookId)).reverse();
         },
 
         get filteredCatalog() {
@@ -1246,7 +1811,6 @@
 
         isBookAvailable(bookId) {
           const allCopies = this.getBookCopies(bookId);
-          // If a book has no copy row yet, allow lending (it will auto-generate Copy 1)
           if (allCopies.length === 0) return true;
           return this.getAvailableCopies(bookId).length > 0;
         },
@@ -1261,21 +1825,15 @@
           return b ? b.Title_English : bookId;
         },
 
-        getPrimaryCopyLocation(bookId) {
-          const c = this.copies.find(x => String(x.Book_ID) === String(bookId));
-          return c && c.Shelf_Location ? c.Shelf_Location : 'Main Shelf';
-        },
-
         // ===================================================================
-        // FIXED DIRECT LEND OUT & DIRECT RETURN FROM CATALOG CARD
+        // DIRECT LEND OUT & RETURN
         // ===================================================================
         async openQuickCheckoutModal(book) {
           let avail = this.getAvailableCopies(book.Book_ID);
 
-          // If this book has 0 physical copies in 2_Copies, auto-create Copy 1 immediately
           if (avail.length === 0 && this.getBookCopies(book.Book_ID).length === 0) {
             this.loading = true;
-            this.loadingText = 'Preparing book copy ID...';
+            this.loadingText = 'Generating book copy ID...';
             try {
               const res = await fetch(this.apiUrl, {
                 method: 'POST',
@@ -1316,7 +1874,6 @@
         },
 
         async confirmDirectCheckout() {
-          // If user typed a new borrower inline, create that member first
           if (this.quickNewMemberMode) {
             if (!this.quickMemberName.trim()) {
               alert('Please enter the borrower name.');
@@ -1396,36 +1953,7 @@
         },
 
         // ===================================================================
-        // HOME PAGE QR SCANNER
-        // ===================================================================
-        toggleHomeQrScanner() {
-          if (this.homeScannerActive) { this.stopAllScanners(); return; }
-          this.stopAllScanners();
-          this.homeScannerActive = true;
-          this.$nextTick(() => {
-            this.qrInstance = new Html5Qrcode("home-qr-reader");
-            this.qrInstance.start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 240, height: 150 } },
-              (decodedText) => {
-                const code = decodedText.trim();
-                this.stopAllScanners();
-                const copyMatch = this.copies.find(c => String(c.Accession_Number).toUpperCase() === code.toUpperCase());
-                if (copyMatch) {
-                  const parentBook = this.catalog.find(b => String(b.Book_ID) === String(copyMatch.Book_ID));
-                  if (parentBook) { this.openBookDetail(parentBook); return; }
-                }
-                const isbnMatch = this.catalog.find(b => String(b.ISBN).replace(/[^0-9X]/gi, '') === code.replace(/[^0-9X]/gi, ''));
-                if (isbnMatch) this.openBookDetail(isbnMatch);
-                else alert(`No book found matching scanned code: ${code}`);
-              },
-              () => {}
-            ).catch(() => { this.homeScannerActive = false; });
-          });
-        },
-
-        // ===================================================================
-        // ADD / EDIT BOOK & AI PIPELINE
+        // ADD / EDIT / DELETE BOOK
         // ===================================================================
         openNewBookForm() {
           this.resetFormBook();
@@ -1452,24 +1980,19 @@
           this.switchTab('form');
         },
 
-        rescanIsbn() {
-          this.formBook.ISBN = '';
-          if (this.formScannerActive) { this.stopAllScanners(); return; }
-          this.stopAllScanners();
-          this.formScannerActive = true;
-          this.$nextTick(() => {
-            this.qrInstance = new Html5Qrcode("form-isbn-reader");
-            this.qrInstance.start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 220, height: 110 } },
-              (decoded) => {
-                this.formBook.ISBN = decoded.trim();
-                this.stopAllScanners();
-                this.runAiPipeline();
-              },
-              () => {}
-            ).catch(() => { this.formScannerActive = false; });
-          });
+        async deleteBook(bookId) {
+          if (!bookId || !confirm('Are you sure you want to permanently delete this book record?')) return;
+          this.loading = true;
+          try {
+            await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'deleteRecord', pin: this.adminPin, data: { table: '1_Catalog', pkColumn: 'Book_ID', id: bookId } })
+            });
+            await this.loadSnapshot();
+            this.switchTab('catalog');
+          } finally {
+            this.loading = false;
+          }
         },
 
         handleCoverUpload(event, side) {
@@ -1600,27 +2123,9 @@
         },
 
         // ===================================================================
-        // CHECK-IN, RENEWAL, WHATSAPP & STICKERS
+        // CHECK-IN, RENEWAL, WHATSAPP, STICKERS & CSV/JSON EXPORTS
         // ===================================================================
         openBookDetail(book) { this.selectedBook = book; },
-
-        startDeskScanner(mode) {
-          if (this.deskScannerMode === mode) { this.stopAllScanners(); return; }
-          this.stopAllScanners();
-          this.deskScannerMode = mode;
-          this.$nextTick(() => {
-            this.qrInstance = new Html5Qrcode('desk-scanner-checkout');
-            this.qrInstance.start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 220, height: 140 } },
-              (decoded) => {
-                this.checkoutForm.Accession_Number = decoded.trim();
-                this.stopAllScanners();
-              },
-              () => {}
-            ).catch(() => { this.deskScannerMode = ''; });
-          });
-        },
 
         async quickReturn(txn) {
           this.loading = true;
@@ -1671,13 +2176,48 @@
         },
 
         renderSmallStickers() {
+          const qrSize = this.stickerDensity === 'ultra' ? 40 : (this.stickerDensity === 'compact' ? 48 : 56);
           this.copies.forEach(c => {
             const el = document.getElementById('mini-qr-' + c.Accession_Number);
             if (el) {
               el.innerHTML = '';
-              new QRCode(el, { text: c.Accession_Number, width: 50, height: 50, correctLevel: QRCode.CorrectLevel.M });
+              new QRCode(el, { text: c.Accession_Number, width: qrSize, height: qrSize, correctLevel: QRCode.CorrectLevel.L });
             }
           });
+        },
+
+        exportTableToCSV(rowsArray, filePrefix) {
+          if (!rowsArray || !rowsArray.length) {
+            alert('No records available to export.');
+            return;
+          }
+          const headers = Object.keys(rowsArray[0]);
+          const csvLines = [
+            headers.join(','),
+            ...rowsArray.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))
+          ];
+          const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `${filePrefix}_${new Date().toISOString().substring(0, 10)}.csv`;
+          link.click();
+        },
+
+        exportFullJsonBackup() {
+          const backup = {
+            exportedAt: new Date().toISOString(),
+            libraryName: this.libraryName,
+            catalog: this.catalog,
+            copies: this.copies,
+            members: this.members,
+            transactions: this.transactions,
+            digitalArchive: this.digitalArchive
+          };
+          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `Library_Full_Backup_${new Date().toISOString().substring(0, 10)}.json`;
+          link.click();
         },
 
         async handleDirectArchivePdfUpload(event) {
@@ -1748,25 +2288,6 @@
 
         isOverdue(dueStr) {
           return dueStr && String(dueStr).substring(0, 10) < new Date().toISOString().substring(0, 10);
-        },
-
-        stopAllScanners() {
-          if (this.qrInstance) {
-            this.qrInstance.stop().then(() => {
-              this.qrInstance.clear();
-              this.homeScannerActive = false;
-              this.formScannerActive = false;
-              this.deskScannerMode = '';
-            }).catch(() => {
-              this.homeScannerActive = false;
-              this.formScannerActive = false;
-              this.deskScannerMode = '';
-            });
-          } else {
-            this.homeScannerActive = false;
-            this.formScannerActive = false;
-            this.deskScannerMode = '';
-          }
         }
       };
     }
