@@ -1,0 +1,18 @@
+{
+  "name": "SKD Home Library & Digital Archive",
+  "short_name": "SKD Library",
+  "description": "Home Library Catalog, Lending Desk & Digital Archive",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2232/2232688.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
