@@ -1084,6 +1084,62 @@
   </main>
 
   <!-- ===================================================================== -->
+  <!-- MODAL 0A: INTERACTIVE 4-POINT CROP & PERSPECTIVE WARP MODAL           -->
+  <!-- ===================================================================== -->
+  <div x-show="showCropWarpModal" x-cloak class="fixed inset-0 bg-slate-900/85 flex items-center justify-center p-3 z-50 no-print">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl space-y-3">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">
+            ✂️ Crop & Perspective Warp (<span class="uppercase text-blue-600" x-text="cropSide + ' Cover'"></span>)
+          </h3>
+          <p class="text-[11px] text-slate-500">Drag the 4 red corner dots to the 4 corners of the book cover.</p>
+        </div>
+        <button type="button" @click="closeCropWarpModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+
+      <!-- Interactive Canvas Container (Supports Mouse & Touch Dragging) -->
+      <div class="relative bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center select-none touch-none">
+        <canvas id="crop-warp-canvas"
+                class="max-w-full max-h-[58vh] block cursor-crosshair"
+                @mousedown="startCornerDrag($event)"
+                @mousemove="moveCornerDrag($event)"
+                @mouseup="endCornerDrag()"
+                @mouseleave="endCornerDrag()"
+                @touchstart.prevent="startCornerDrag($event)"
+                @touchmove.prevent="moveCornerDrag($event)"
+                @touchend.prevent="endCornerDrag()"></canvas>
+      </div>
+
+      <!-- Toolbar: Rotate 90°, Reset Corners, Use Full Image, Apply Warp -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+        <div class="flex gap-1.5">
+          <button type="button" @click="rotateSourceImage90()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-2 rounded-xl">
+            ↻ Rotate 90°
+          </button>
+          <button type="button" @click="resetWarpCorners()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-2 rounded-xl">
+            ⊞ Reset Box
+          </button>
+        </div>
+
+        <div class="flex gap-1.5">
+          <button type="button" @click="useOriginalWithoutWarp()"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold px-3 py-2 rounded-xl">
+            Skip Crop
+          </button>
+          <button type="button" @click="applyPerspectiveWarp()"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl shadow">
+            ✅ Apply Warp & Crop
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ===================================================================== -->
   <!-- MODAL 0: UNIVERSAL MOBILE-FIXED QR & BARCODE SCANNER MODAL            -->
   <!-- ===================================================================== -->
   <div x-show="showScannerModal" x-cloak class="fixed inset-0 bg-slate-900/75 flex items-center justify-center p-4 z-50 no-print">
@@ -1454,6 +1510,14 @@
         scannerTarget: 'home', // 'home' | 'isbn' | 'checkout'
         manualScanInput: '',
         qrInstance: null,
+
+        // Crop & Perspective Warp State
+        showCropWarpModal: false,
+        cropSide: 'front',          // 'front' | 'back'
+        cropSourceImg: null,        // HTMLImageElement
+        cropCanvasScale: 1,         // Display scale factor
+        cropCorners: [],            // [{x, y}, {x, y}, {x, y}, {x, y}] in image pixels (TL, TR, BR, BL)
+        activeDragCornerIdx: -1,
 
         // Forms
         formBook: {},
@@ -1997,26 +2061,301 @@
           }
         },
 
+        // ===================================================================
+        // INTERACTIVE 4-POINT PERSPECTIVE WARP & CROP ENGINE
+        // ===================================================================
         handleCoverUpload(event, side) {
           const file = event.target.files[0];
           if (!file) return;
+          this.cropSide = side;
+
           const reader = new FileReader();
           reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-              const canvas = document.createElement('canvas');
-              let w = img.width, h = img.height, maxDim = 1000;
-              if (w > h && w > maxDim) { h *= maxDim / w; w = maxDim; }
-              else if (h > maxDim) { w *= maxDim / h; h = maxDim; }
-              canvas.width = w; canvas.height = h;
-              canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-              const compressed = canvas.toDataURL('image/jpeg', 0.8);
-              if (side === 'front') this.formBook.frontCoverBase64 = compressed;
-              else this.formBook.backCoverBase64 = compressed;
+              // Normalize source image to max 1200px for smooth mobile canvas performance
+              const offCanvas = document.createElement('canvas');
+              let w = img.width, h = img.height, maxDim = 1200;
+              if (w > h && w > maxDim) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+              else if (h > maxDim) { w = Math.round(w * (maxDim / h)); h = maxDim; }
+              offCanvas.width = w;
+              offCanvas.height = h;
+              offCanvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+              const normalizedImg = new Image();
+              normalizedImg.onload = () => {
+                this.cropSourceImg = normalizedImg;
+                this.showCropWarpModal = true;
+                this.$nextTick(() => {
+                  this.resetWarpCorners();
+                });
+              };
+              normalizedImg.src = offCanvas.toDataURL('image/jpeg', 0.9);
             };
             img.src = e.target.result;
           };
           reader.readAsDataURL(file);
+          event.target.value = ''; // Allow re-selecting the same file if needed
+        },
+
+        resetWarpCorners() {
+          if (!this.cropSourceImg) return;
+          const w = this.cropSourceImg.width;
+          const h = this.cropSourceImg.height;
+          const padX = Math.round(w * 0.08);
+          const padY = Math.round(h * 0.08);
+
+          // Order: 0 = Top-Left, 1 = Top-Right, 2 = Bottom-Right, 3 = Bottom-Left
+          this.cropCorners = [
+            { x: padX,     y: padY },
+            { x: w - padX, y: padY },
+            { x: w - padX, y: h - padY },
+            { x: padX,     y: h - padY }
+          ];
+          this.drawCropWarpCanvas();
+        },
+
+        rotateSourceImage90() {
+          if (!this.cropSourceImg) return;
+          const srcW = this.cropSourceImg.width;
+          const srcH = this.cropSourceImg.height;
+          const off = document.createElement('canvas');
+          off.width = srcH;
+          off.height = srcW;
+          const ctx = off.getContext('2d');
+          ctx.translate(srcH / 2, srcW / 2);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(this.cropSourceImg, -srcW / 2, -srcH / 2);
+
+          const rotatedImg = new Image();
+          rotatedImg.onload = () => {
+            this.cropSourceImg = rotatedImg;
+            this.resetWarpCorners();
+          };
+          rotatedImg.src = off.toDataURL('image/jpeg', 0.92);
+        },
+
+        drawCropWarpCanvas() {
+          const canvas = document.getElementById('crop-warp-canvas');
+          if (!canvas || !this.cropSourceImg) return;
+
+          const img = this.cropSourceImg;
+          const maxDisplayW = Math.min(window.innerWidth - 48, 460);
+          const maxDisplayH = Math.min(window.innerHeight * 0.55, 480);
+          const scale = Math.min(maxDisplayW / img.width, maxDisplayH / img.height, 1);
+
+          this.cropCanvasScale = scale;
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // 1. Draw full dimmed image
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // 2. Highlight inside of selected 4-corner polygon
+          const pts = this.cropCorners.map(p => ({ x: p.x * scale, y: p.y * scale }));
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          ctx.lineTo(pts[1].x, pts[1].y);
+          ctx.lineTo(pts[2].x, pts[2].y);
+          ctx.lineTo(pts[3].x, pts[3].y);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+
+          // 3. Draw polygon border lines + perspective grid lines
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          ctx.lineTo(pts[1].x, pts[1].y);
+          ctx.lineTo(pts[2].x, pts[2].y);
+          ctx.lineTo(pts[3].x, pts[3].y);
+          ctx.closePath();
+          ctx.stroke();
+
+          // 4. Draw 4 draggable corner handles
+          const labels = ['TL', 'TR', 'BR', 'BL'];
+          pts.forEach((p, idx) => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 13, 0, Math.PI * 2);
+            ctx.fillStyle = idx === this.activeDragCornerIdx ? '#16a34a' : '#ef4444';
+            ctx.fill();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labels[idx], p.x, p.y);
+          });
+        },
+
+        getCanvasPointerPos(event) {
+          const canvas = document.getElementById('crop-warp-canvas');
+          const rect = canvas.getBoundingClientRect();
+          const clientX = event.touches && event.touches.length ? event.touches[0].clientX : event.clientX;
+          const clientY = event.touches && event.touches.length ? event.touches[0].clientY : event.clientY;
+          return {
+            x: (clientX - rect.left) / this.cropCanvasScale,
+            y: (clientY - rect.top) / this.cropCanvasScale
+          };
+        },
+
+        startCornerDrag(event) {
+          if (!this.cropCorners.length) return;
+          const pos = this.getCanvasPointerPos(event);
+          const hitRadius = 32 / this.cropCanvasScale;
+
+          let closestIdx = -1;
+          let minDist = Infinity;
+          this.cropCorners.forEach((c, idx) => {
+            const d = Math.hypot(c.x - pos.x, c.y - pos.y);
+            if (d < hitRadius && d < minDist) {
+              minDist = d;
+              closestIdx = idx;
+            }
+          });
+          this.activeDragCornerIdx = closestIdx;
+          if (closestIdx !== -1) this.drawCropWarpCanvas();
+        },
+
+        moveCornerDrag(event) {
+          if (this.activeDragCornerIdx === -1 || !this.cropSourceImg) return;
+          const pos = this.getCanvasPointerPos(event);
+          const maxW = this.cropSourceImg.width;
+          const maxH = this.cropSourceImg.height;
+
+          this.cropCorners[this.activeDragCornerIdx] = {
+            x: Math.max(0, Math.min(maxW, pos.x)),
+            y: Math.max(0, Math.min(maxH, pos.y))
+          };
+          this.drawCropWarpCanvas();
+        },
+
+        endCornerDrag() {
+          if (this.activeDragCornerIdx !== -1) {
+            this.activeDragCornerIdx = -1;
+            this.drawCropWarpCanvas();
+          }
+        },
+
+        useOriginalWithoutWarp() {
+          if (!this.cropSourceImg) return;
+          const off = document.createElement('canvas');
+          off.width = this.cropSourceImg.width;
+          off.height = this.cropSourceImg.height;
+          off.getContext('2d').drawImage(this.cropSourceImg, 0, 0);
+          const dataUrl = off.toDataURL('image/jpeg', 0.82);
+
+          if (this.cropSide === 'front') this.formBook.frontCoverBase64 = dataUrl;
+          else this.formBook.backCoverBase64 = dataUrl;
+          this.closeCropWarpModal();
+        },
+
+        // 8-DOF Projective Homography Matrix Warp (Flattens Skewed 4-Point Quad to Upright Rectangle)
+        applyPerspectiveWarp() {
+          if (!this.cropSourceImg || this.cropCorners.length !== 4) return;
+          const [p0, p1, p2, p3] = this.cropCorners; // TL, TR, BR, BL
+
+          // Compute natural output width & height from the 4 edges
+          const topW = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+          const botW = Math.hypot(p2.x - p3.x, p2.y - p3.y);
+          const leftH = Math.hypot(p3.x - p0.x, p3.y - p0.y);
+          const rightH = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+          let dstW = Math.round(Math.max(topW, botW));
+          let dstH = Math.round(Math.max(leftH, rightH));
+
+          // Cap max output dimension to 900px for fast calculation & clean storage
+          const maxOut = 900;
+          if (dstW > maxOut || dstH > maxOut) {
+            const ratio = maxOut / Math.max(dstW, dstH);
+            dstW = Math.max(100, Math.round(dstW * ratio));
+            dstH = Math.max(100, Math.round(dstH * ratio));
+          }
+
+          // Extract source pixel buffer
+          const srcCanvas = document.createElement('canvas');
+          const srcW = this.cropSourceImg.width;
+          const srcH = this.cropSourceImg.height;
+          srcCanvas.width = srcW;
+          srcCanvas.height = srcH;
+          const srcCtx = srcCanvas.getContext('2d');
+          srcCtx.drawImage(this.cropSourceImg, 0, 0);
+          const srcData = srcCtx.getImageData(0, 0, srcW, srcH).data;
+
+          // Compute Projective Homography Coefficients mapping unit square (s,t) in [0,1]^2 -> (x,y)
+          const dx1 = p1.x - p2.x, dx2 = p3.x - p2.x, sx = p0.x - p1.x + p2.x - p3.x;
+          const dy1 = p1.y - p2.y, dy2 = p3.y - p2.y, sy = p0.y - p1.y + p2.y - p3.y;
+          const det = dx1 * dy2 - dx2 * dy1 || 1e-6;
+          const g = (sx * dy2 - sy * dx2) / det;
+          const h = (dx1 * sy - dy1 * sx) / det;
+          const a = p1.x - p0.x + g * p1.x;
+          const b = p3.x - p0.x + h * p3.x;
+          const c = p0.x;
+          const d = p1.y - p0.y + g * p1.y;
+          const e = p3.y - p0.y + h * p3.y;
+          const f = p0.y;
+
+          // Render destination flattened cover image with bilinear interpolation
+          const dstCanvas = document.createElement('canvas');
+          dstCanvas.width = dstW;
+          dstCanvas.height = dstH;
+          const dstCtx = dstCanvas.getContext('2d');
+          const dstImgData = dstCtx.createImageData(dstW, dstH);
+          const dstPixels = dstImgData.data;
+
+          for (let y = 0; y < dstH; y++) {
+            const t = y / (dstH - 1 || 1);
+            for (let x = 0; x < dstW; x++) {
+              const s = x / (dstW - 1 || 1);
+              const denom = g * s + h * t + 1.0;
+              const srcX = (a * s + b * t + c) / denom;
+              const srcY = (d * s + e * t + f) / denom;
+
+              const x0 = Math.floor(srcX), y0 = Math.floor(srcY);
+              const x1 = Math.min(srcW - 1, x0 + 1), y1 = Math.min(srcH - 1, y0 + 1);
+              const wx = srcX - x0, wy = srcY - y0;
+
+              if (x0 >= 0 && x0 < srcW && y0 >= 0 && y0 < srcH) {
+                const i00 = (y0 * srcW + x0) * 4;
+                const i10 = (y0 * srcW + x1) * 4;
+                const i01 = (y1 * srcW + x0) * 4;
+                const i11 = (y1 * srcW + x1) * 4;
+                const dstIdx = (y * dstW + x) * 4;
+
+                for (let ch = 0; ch < 3; ch++) {
+                  const topVal = srcData[i00 + ch] * (1 - wx) + srcData[i10 + ch] * wx;
+                  const botVal = srcData[i01 + ch] * (1 - wx) + srcData[i11 + ch] * wx;
+                  dstPixels[dstIdx + ch] = Math.round(topVal * (1 - wy) + botVal * wy);
+                }
+                dstPixels[dstIdx + 3] = 255;
+              }
+            }
+          }
+
+          dstCtx.putImageData(dstImgData, 0, 0);
+          const warpedBase64 = dstCanvas.toDataURL('image/jpeg', 0.85);
+
+          if (this.cropSide === 'front') this.formBook.frontCoverBase64 = warpedBase64;
+          else this.formBook.backCoverBase64 = warpedBase64;
+
+          this.closeCropWarpModal();
+        },
+
+        closeCropWarpModal() {
+          this.showCropWarpModal = false;
+          this.cropSourceImg = null;
+          this.activeDragCornerIdx = -1;
         },
 
         handleFormPdfSelect(event) {
