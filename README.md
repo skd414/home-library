@@ -1,8 +1,10 @@
 # 📚 Home Library & Digital Archive Management System (LMS)
 
-A lightweight, serverless **Home Library & Digital Archive Management System** powered by **Google Sheets**, **Google Drive**, **Google Apps Script**, and a responsive **Flat Design Progressive Web App (PWA)**. 
+A lightweight, serverless **Home Library & Digital Archive Management System** (LMS) powered by **Google Sheets**, **Google Drive**, **Google Apps Script**, and a responsive **Flat Design Progressive Web App (PWA)**. 
 
 Designed for personal and home libraries supporting multilingual cataloging (**English, Malayalam, Arabic, Hindi**), camera barcode/QR scanning, interactive 4-point book cover perspective cropping, physical copy tracking, custom WhatsApp reminders (`wa.me`), and an embedded Google Drive PDF Archive reader.
+Github works as a host website only, ALL THE DATAS AS ARE SECURE AND STORED IN THE PERSONAL GOOGLE ACCOUNT ECOSYSTEM ONLY (Sheets, Appscript, Drive)
+Made purely with the help of Gemini AI - 4 Argon (High)
 
 ---
 
