@@ -3,295 +3,478 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SKD Home Library & Digital Archive</title>
+  <title>SKD LIBRARY — SWISS CATALOG & ARCHIVE</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#1e293b" />
+  <meta name="theme-color" content="#111111" />
+
+  <!-- Google Fonts: Inter (Swiss Sans) & JetBrains Mono (Technical Codes) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS & Alpine.js -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Helvetica Neue', 'Arial', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+          colors: {
+            swiss: {
+              bg: '#FAFAFA',
+              ink: '#111111',
+              red: '#E60000',
+              muted: '#666666',
+              border: '#111111'
+            }
+          }
+        }
+      }
+    }
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <!-- Camera Barcode & QR Scanner -->
+  <!-- HTML5 Barcode & QR Scanner -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <!-- QR Code Sticker Generator -->
+  <!-- QR Code Generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
     [x-cloak] { display: none !important; }
+    body { background-color: #FAFAFA; color: #111111; }
+    /* Minimalist Small Spine & QR Sticker Print Layout */
     @media print {
       body * { visibility: hidden; }
-      #printable-label-area, #printable-label-area * { visibility: visible; }
-      #printable-label-area {
+      #printable-stickers, #printable-stickers * { visibility: visible; }
+      #printable-stickers {
         position: absolute;
         left: 0;
         top: 0;
         width: 100%;
-        background: white !important;
+        background: #FFFFFF !important;
+        padding: 4mm;
       }
       .no-print { display: none !important; }
-      .sticker-card { page-break-inside: avoid; break-inside: avoid; }
+      .mini-sticker {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        border: 1px solid #000 !important;
+      }
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col" x-data="lmsApp()" x-init="initApp()">
+<body class="min-h-screen flex flex-col font-sans antialiased pb-16 md:pb-0" x-data="swissLibraryApp()" x-init="initApp()">
 
-  <!-- TOP NAVIGATION BAR -->
-  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5">
-        <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" class="w-8 h-8" alt="Logo" />
+  <!-- ===================================================================== -->
+  <!-- SWISS TOP HEADER BAR                                                  -->
+  <!-- ===================================================================== -->
+  <header class="bg-white border-b-2 border-black sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <!-- Brand Identity -->
+      <div class="flex items-center gap-3 cursor-pointer" @click="resetAllFilters(); switchTab('catalog')">
+        <div class="w-9 h-9 bg-swiss-red text-white flex items-center justify-center font-black text-lg tracking-tighter">
+          SKD
+        </div>
         <div>
-          <h1 class="font-bold text-base sm:text-lg leading-tight">SKD Home Library & Archive</h1>
-          <p class="text-[11px] text-slate-400" x-text="isAdmin ? 'Librarian Mode (Full Control)' : 'Public Catalog View'"></p>
+          <h1 class="font-black text-base sm:text-lg tracking-tight uppercase leading-none">SKD Library & Archive</h1>
+          <p class="font-mono text-[10px] uppercase tracking-widest text-neutral-500 mt-1"
+             x-text="isAdmin ? 'STATUS: LIBRARIAN AUTHENTICATED' : 'STATUS: PUBLIC CATALOG READ-ONLY'"></p>
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
-      <nav class="flex flex-wrap items-center gap-1 text-xs sm:text-sm font-medium">
-        <button @click="switchTab('catalog')" :class="activeTab === 'catalog' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
-          📚 Catalog (<span x-text="catalog.length"></span>)
+      <!-- Desktop Navigation (Hidden on Mobile, replaced by bottom bar) -->
+      <nav class="hidden md:flex items-center border border-black divide-x divide-black text-xs font-bold uppercase tracking-wider">
+        <button @click="switchTab('catalog')" :class="activeTab === 'catalog' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          01 Catalog (<span x-text="catalog.length"></span>)
         </button>
-        <button @click="switchTab('archive')" :class="activeTab === 'archive' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
-          🏛️ Archive (<span x-text="digitalArchive.length"></span>)
+        <button @click="switchTab('directory')" :class="activeTab === 'directory' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          02 Authors & Publishers
         </button>
-        <button x-show="isAdmin" x-cloak @click="switchTab('lending')" :class="activeTab === 'lending' ? 'bg-amber-600 text-white' : 'text-amber-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
-          🔄 Lending Desk (<span x-text="activeTransactions.length"></span>)
+        <button @click="switchTab('archive')" :class="activeTab === 'archive' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          03 PDF Archive (<span x-text="digitalArchive.length"></span>)
         </button>
-        <button x-show="isAdmin" x-cloak @click="switchTab('members')" :class="activeTab === 'members' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
-          👥 Members (<span x-text="members.length"></span>)
+        <button x-show="isAdmin" x-cloak @click="switchTab('lending')" :class="activeTab === 'lending' ? 'bg-swiss-red text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          04 Lending (<span x-text="activeLoans.length"></span>)
         </button>
-        <button x-show="isAdmin" x-cloak @click="switchTab('whatsapp')" :class="activeTab === 'whatsapp' ? 'bg-emerald-600 text-white' : 'text-emerald-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition flex items-center gap-1">
-          💬 WhatsApp
-          <span x-show="whatsappQueue.length > 0" class="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold" x-text="whatsappQueue.length"></span>
+        <button x-show="isAdmin" x-cloak @click="openNewBookForm()" :class="activeTab === 'form' ? 'bg-swiss-red text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          + Add Book
         </button>
-        <button x-show="isAdmin" x-cloak @click="switchTab('labels')" :class="activeTab === 'labels' ? 'bg-indigo-600 text-white' : 'text-indigo-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
-          🏷️ Labels
+        <button x-show="isAdmin" x-cloak @click="switchTab('labels')" :class="activeTab === 'labels' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          Stickers
         </button>
-        <button x-show="isAdmin" x-cloak @click="switchTab('addBook')" :class="activeTab === 'addBook' ? 'bg-teal-600 text-white' : 'text-teal-300 hover:bg-slate-800'" class="px-2.5 py-1.5 rounded-lg transition">
-          ➕ Add Book
+        <button x-show="isAdmin" x-cloak @click="switchTab('config')" :class="activeTab === 'config' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'" class="px-3.5 py-2 transition">
+          Templates & Members
         </button>
       </nav>
 
-      <!-- Right Controls -->
-      <div class="flex items-center gap-1.5">
-        <button x-show="installPromptEvent" x-cloak @click="installPWA()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-2.5 py-1.5 rounded-lg font-semibold">
-          📲 Install
+      <!-- Utility Actions -->
+      <div class="flex items-center gap-2">
+        <button x-show="installPromptEvent" x-cloak @click="installPWA()"
+                class="border border-black bg-swiss-red text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider">
+          Install App
         </button>
-        <button x-show="isAdmin" x-cloak @click="exportCatalogCSV()" title="Export Catalog CSV Backup" class="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1.5 rounded-lg">
-          📥 Backup
-        </button>
-        <button @click="showSettingsModal = true" class="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1.5 rounded-lg">
-          ⚙️ <span x-text="isAdmin ? 'Admin' : 'Login'"></span>
+        <button @click="showLoginModal = true"
+                class="border border-black bg-white hover:bg-black hover:text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider transition">
+          <span x-text="isAdmin ? 'Admin ✓' : 'Staff Login'"></span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- LOADING BAR -->
-  <div x-show="loading" x-cloak class="bg-blue-600 text-white text-xs text-center py-1.5 font-medium animate-pulse no-print">
-    <span x-text="loadingMessage">Syncing with Google Sheets...</span>
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t-2 border-black z-30 grid grid-cols-5 divide-x divide-black text-[10px] font-bold uppercase tracking-tighter no-print">
+    <button @click="switchTab('catalog')" :class="activeTab === 'catalog' ? 'bg-black text-white' : 'text-black'" class="py-2.5 flex flex-col items-center">
+      <span>Catalog</span>
+    </button>
+    <button @click="switchTab('directory')" :class="activeTab === 'directory' ? 'bg-black text-white' : 'text-black'" class="py-2.5 flex flex-col items-center">
+      <span>Authors</span>
+    </button>
+    <button @click="switchTab('archive')" :class="activeTab === 'archive' ? 'bg-black text-white' : 'text-black'" class="py-2.5 flex flex-col items-center">
+      <span>Archive</span>
+    </button>
+    <button x-show="isAdmin" @click="switchTab('lending')" :class="activeTab === 'lending' ? 'bg-swiss-red text-white' : 'text-black'" class="py-2.5 flex flex-col items-center">
+      <span>Lending</span>
+    </button>
+    <button x-show="isAdmin" @click="openNewBookForm()" :class="activeTab === 'form' ? 'bg-swiss-red text-white' : 'text-black'" class="py-2.5 flex flex-col items-center">
+      <span>+ Add</span>
+    </button>
+    <button x-show="!isAdmin" @click="toggleHomeQrScanner()" class="bg-swiss-red text-white py-2.5 flex flex-col items-center col-span-2">
+      <span>📷 Scan Book QR</span>
+    </button>
+  </nav>
+
+  <!-- STATUS SYNC BANNER -->
+  <div x-show="loading" x-cloak class="bg-swiss-red text-white font-mono text-xs uppercase tracking-widest text-center py-1.5 border-b border-black no-print">
+    <span x-text="loadingText">SYNCING DATABASE...</span>
   </div>
 
-  <!-- MAIN CONTENT AREA -->
+  <!-- MAIN WORKSPACE -->
   <main class="max-w-7xl w-full mx-auto px-4 py-6 flex-1">
 
-    <!-- ================================================================= -->
-    <!-- TAB 1: PUBLIC & LIBRARIAN CATALOG                                 -->
-    <!-- ================================================================= -->
-    <section x-show="activeTab === 'catalog'" x-cloak class="no-print">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-5 gap-3">
-        <div class="md:col-span-2">
-          <input type="text" x-model="searchQuery" placeholder="Search Title (English/Malayalam/Arabic), Author, ISBN, Call No, or Shelf..."
-                 class="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+    <!-- =================================================================== -->
+    <!-- VIEW 01: CATALOG + HOME PAGE QR SCANNER + DIRECT ACTIONS            -->
+    <!-- =================================================================== -->
+    <section x-show="activeTab === 'catalog'" x-cloak class="no-print space-y-6">
+
+      <!-- Swiss Search, Filter & QR Scan Control Bar -->
+      <div class="bg-white border-2 border-black p-4">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <!-- Search Box -->
+          <div class="md:col-span-5">
+            <label class="block font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Search Catalog (English / മലയാളം / العربية / ISBN / Call No)</label>
+            <input type="text" x-model="searchQuery" placeholder="Type title, author, publisher, or accession..."
+                   class="w-full border border-black px-3 py-2 text-sm focus:outline-none focus:bg-neutral-50" />
+          </div>
+
+          <!-- Language Filter -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Language</label>
+            <select x-model="filterLanguage" class="w-full border border-black px-2.5 py-2 text-sm bg-white">
+              <option value="">All Languages</option>
+              <template x-for="lang in configList('Language')" :key="lang">
+                <option :value="lang" x-text="lang"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Genre/Category Filter -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Category / Genre</label>
+            <select x-model="filterCategory" class="w-full border border-black px-2.5 py-2 text-sm bg-white">
+              <option value="">All Categories</option>
+              <template x-for="cat in configList('Category_Genre')" :key="cat">
+                <option :value="cat" x-text="cat"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- HOME PAGE QR SCANNER BUTTON (GET BOOK DETAILS BY SCANNING PHYSICAL BOOK) -->
+          <div class="md:col-span-3 flex items-end gap-2">
+            <button @click="toggleHomeQrScanner()"
+                    class="flex-1 bg-swiss-red hover:bg-black text-white font-bold text-xs uppercase tracking-wider py-2.5 px-3 border border-black transition flex items-center justify-center gap-1.5">
+              <span>📷</span>
+              <span x-text="homeScannerActive ? 'Close Scanner' : 'Scan Book QR'"></span>
+            </button>
+            <button @click="loadSnapshot()" title="Refresh Catalog" class="border border-black bg-white hover:bg-neutral-100 px-3 py-2 text-sm font-bold">↻</button>
+          </div>
         </div>
-        <div>
-          <select x-model="filterLanguage" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-            <option value="">All Languages</option>
-            <template x-for="lang in uniqueLanguages" :key="lang">
-              <option :value="lang" x-text="lang"></option>
-            </template>
-          </select>
+
+        <!-- Home Page Camera Viewport (Opens when Scan Book QR is clicked) -->
+        <div x-show="homeScannerActive" x-cloak class="mt-4 border-t-2 border-black pt-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-xs font-bold uppercase text-swiss-red">● Point camera at the physical book's QR sticker or ISBN barcode</span>
+            <button @click="stopAllScanners()" class="text-xs font-mono underline">Cancel</button>
+          </div>
+          <div id="home-qr-reader" class="max-w-md mx-auto border border-black overflow-hidden"></div>
         </div>
-        <div>
-          <select x-model="filterGenre" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-            <option value="">All Genres</option>
-            <template x-for="g in uniqueGenres" :key="g">
-              <option :value="g" x-text="g"></option>
-            </template>
-          </select>
-        </div>
-        <div class="flex gap-2">
-          <select x-model="filterStatus" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-            <option value="">All Availability</option>
-            <option value="Available">Available Now</option>
-            <option value="Lent">Currently Lent Out</option>
-            <option value="Digital">Has Digital Scan</option>
-          </select>
-          <button @click="loadSnapshot()" title="Refresh" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm">🔄</button>
+
+        <!-- Active Categorization Filter Pill (Author / Publisher / Shelf) -->
+        <div x-show="activeAuthorFilter || activePublisherFilter || filterCategory || filterLanguage" x-cloak
+             class="mt-3 pt-3 border-t border-neutral-200 flex flex-wrap items-center gap-2 text-xs">
+          <span class="font-mono uppercase text-[10px] text-neutral-500">Active Filters:</span>
+          <template x-if="activeAuthorFilter">
+            <span class="bg-black text-white font-bold px-2.5 py-1 flex items-center gap-2">
+              Author: <span x-text="activeAuthorFilter"></span>
+              <button @click="activeAuthorFilter = ''" class="text-swiss-red font-black">✕</button>
+            </span>
+          </template>
+          <template x-if="activePublisherFilter">
+            <span class="bg-black text-white font-bold px-2.5 py-1 flex items-center gap-2">
+              Publisher: <span x-text="activePublisherFilter"></span>
+              <button @click="activePublisherFilter = ''" class="text-swiss-red font-black">✕</button>
+            </span>
+          </template>
+          <button @click="resetAllFilters()" class="font-mono text-[11px] underline text-swiss-red ml-2">Reset All</button>
         </div>
       </div>
 
-      <!-- Book Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <!-- SWISS TYPOGRAPHIC BOOK GRID -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-l border-black">
         <template x-for="book in filteredCatalog" :key="book.Book_ID">
-          <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition">
-            <div class="h-48 bg-slate-100 relative flex items-center justify-center overflow-hidden">
-              <template x-if="book.Cover_Image_URL">
-                <img :src="book.Cover_Image_URL" class="h-full w-full object-contain" alt="Cover" />
-              </template>
-              <template x-if="!book.Cover_Image_URL">
-                <div class="text-slate-400 text-center p-4">
-                  <div class="text-3xl mb-1">📖</div>
-                  <div class="text-xs" x-text="book.Language"></div>
+          <article class="bg-white border-r border-b border-black p-4 flex flex-col justify-between hover:bg-neutral-50 transition">
+            <div>
+              <!-- Top Metadata Row: Call Number & Format Badge -->
+              <div class="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-neutral-200 font-mono text-[11px]">
+                <span class="font-bold bg-black text-white px-2 py-0.5" x-text="book.Call_Number || 'UNCL'"></span>
+                <div class="flex items-center gap-1">
+                  <span x-show="book.Book_Type && book.Book_Type !== 'Normal Book'" class="border border-black px-1.5 py-0.2 text-[10px] font-bold uppercase"
+                        x-text="book.Book_Type + (book.Volume_Number ? ' V.' + book.Volume_Number : '')"></span>
+                  <span x-show="book.Has_Digital_Copy" class="bg-swiss-red text-white px-1.5 py-0.2 text-[10px] font-bold">PDF</span>
                 </div>
-              </template>
-              <span class="absolute top-2 left-2 bg-slate-900/85 text-white text-[11px] font-mono px-2 py-0.5 rounded"
-                    x-text="book.Call_Number || 'UNCLASSIFIED'"></span>
-              <span x-show="book.Has_Digital_Copy" class="absolute top-2 right-2 bg-indigo-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded">
-                PDF ARCHIVE
-              </span>
-            </div>
-
-            <div class="p-4 flex-1 flex flex-col justify-between">
-              <div>
-                <h3 class="font-bold text-slate-900 text-base leading-snug" x-text="book.Title"></h3>
-                <p x-show="book.Original_Title" class="text-sm text-blue-700 font-medium mt-0.5" x-text="book.Original_Title"></p>
-                <p class="text-xs text-slate-500 mt-1" x-text="book.Authors"></p>
-                <p class="text-xs text-slate-600 mt-2 line-clamp-2" x-text="book.Description || 'No description provided.'"></p>
               </div>
 
-              <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span :class="getAvailableCopyCount(book.Book_ID) > 0 ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'"
-                      class="px-2 py-1 rounded font-semibold"
-                      x-text="getAvailableCopyCount(book.Book_ID) + ' / ' + getBookCopies(book.Book_ID).length + ' Available'">
-                </span>
-                <button @click="openBookDetailModal(book)" class="text-blue-600 hover:underline font-semibold">
-                  Copies & History →
+              <!-- Cover Thumbnail + Dual Title Layout -->
+              <div class="flex gap-3.5 mb-3 cursor-pointer" @click="openBookDetail(book)">
+                <div class="w-20 h-28 border border-black bg-neutral-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                  <template x-if="book.Cover_Image_URL">
+                    <img :src="book.Cover_Image_URL" class="w-full h-full object-cover" alt="Cover" />
+                  </template>
+                  <template x-if="!book.Cover_Image_URL">
+                    <span class="font-mono text-[10px] text-neutral-400 uppercase text-center px-1" x-text="book.Language"></span>
+                  </template>
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <!-- English Title -->
+                  <h3 class="font-black text-base leading-tight tracking-tight text-black break-words" x-text="book.Title_English"></h3>
+                  <!-- Original Script Title (Malayalam / Arabic / Hindi) -->
+                  <p x-show="book.Title_Original" class="text-sm font-bold text-neutral-700 mt-1 leading-snug" x-text="book.Title_Original"></p>
+                  <!-- Series Subtitle if applicable -->
+                  <p x-show="book.Series_Name" class="font-mono text-[11px] text-swiss-red mt-1"
+                     x-text="book.Series_Name + (book.Volume_Number ? ' #' + book.Volume_Number : '')"></p>
+                </div>
+              </div>
+
+              <!-- Clickable Categorization Pills: Author, Publisher, Category -->
+              <div class="space-y-1 text-xs border-t border-neutral-200 pt-2.5">
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="font-mono text-[10px] uppercase text-neutral-500">Author:</span>
+                  <button @click="filterByAuthor(book.Authors)" class="font-bold text-right hover:text-swiss-red underline truncate" x-text="book.Authors || 'Unknown'"></button>
+                </div>
+                <div class="flex items-baseline justify-between gap-2" x-show="book.Publisher">
+                  <span class="font-mono text-[10px] uppercase text-neutral-500">Publisher:</span>
+                  <button @click="filterByPublisher(book.Publisher)" class="font-medium text-right hover:text-swiss-red underline truncate" x-text="book.Publisher"></button>
+                </div>
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="font-mono text-[10px] uppercase text-neutral-500">Category:</span>
+                  <button @click="filterCategory = book.Category_Genre" class="font-mono text-[11px] text-right hover:text-swiss-red underline truncate" x-text="book.Category_Genre || 'General'"></button>
+                </div>
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="font-mono text-[10px] uppercase text-neutral-500">Shelf:</span>
+                  <span class="font-mono text-[11px] text-right truncate" x-text="getPrimaryCopyLocation(book.Book_ID)"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Footer: Availability + Direct Checkout & Direct Edit Buttons -->
+            <div class="mt-4 pt-3 border-t border-black flex items-center justify-between gap-1.5">
+              <span class="font-mono text-[10px] font-bold uppercase px-2 py-1 border border-black"
+                    :class="getAvailableCopies(book.Book_ID).length > 0 ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-100 text-amber-900'"
+                    x-text="getAvailableCopies(book.Book_ID).length > 0 ? 'AVAILABLE (' + getAvailableCopies(book.Book_ID).length + ')' : 'LENT OUT'">
+              </span>
+
+              <div class="flex items-center gap-1">
+                <!-- Direct Quick Checkout from Catalog -->
+                <button x-show="isAdmin && getAvailableCopies(book.Book_ID).length > 0"
+                        @click="openQuickCheckoutModal(book)"
+                        class="bg-swiss-red text-white font-mono text-[10px] font-bold uppercase px-2 py-1 border border-black hover:bg-black transition">
+                  Lend
+                </button>
+                <!-- Direct Edit from Catalog -->
+                <button x-show="isAdmin"
+                        @click="openEditBookForm(book)"
+                        class="bg-white text-black font-mono text-[10px] font-bold uppercase px-2 py-1 border border-black hover:bg-black hover:text-white transition">
+                  Edit
+                </button>
+                <button @click="openBookDetail(book)"
+                        class="bg-black text-white font-mono text-[10px] font-bold uppercase px-2 py-1 border border-black">
+                  View
                 </button>
               </div>
             </div>
-          </div>
+          </article>
         </template>
       </div>
     </section>
 
-    <!-- ================================================================= -->
-    <!-- TAB 2: DIGITAL ARCHIVE (GOOGLE DRIVE SCANNED BOOKS)               -->
-    <!-- ================================================================= -->
-    <section x-show="activeTab === 'archive'" x-cloak class="no-print">
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900">🏛️ Digital Preservation Archive</h2>
-          <p class="text-xs text-slate-500">Scanned PDFs and preserved copies of old, rare, or fragile books stored in your Google Drive.</p>
+    <!-- =================================================================== -->
+    <!-- VIEW 02: AUTHOR & PUBLISHER CATEGORIZATION DIRECTORY                -->
+    <!-- =================================================================== -->
+    <section x-show="activeTab === 'directory'" x-cloak class="no-print grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Authors Index -->
+      <div class="bg-white border-2 border-black p-5">
+        <h2 class="font-black text-lg uppercase tracking-tight border-b-2 border-black pb-2 mb-4">
+          Authors Index (<span x-text="knownAuthors.length"></span>)
+        </h2>
+        <p class="text-xs text-neutral-600 mb-4">Click any author to list only books written by them.</p>
+        <div class="divide-y divide-neutral-200 max-h-[65vh] overflow-y-auto">
+          <template x-for="aut in knownAuthors" :key="aut">
+            <button @click="filterByAuthor(aut)" class="w-full py-2.5 px-2 flex items-center justify-between hover:bg-black hover:text-white text-left text-sm font-bold transition">
+              <span x-text="aut"></span>
+              <span class="font-mono text-xs" x-text="countBooksByAuthor(aut) + ' Books →'"></span>
+            </button>
+          </template>
         </div>
-        <div x-show="isAdmin" class="flex gap-2">
-          <button @click="syncDriveFolder()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-lg">
-            🔄 Auto-Sync `/LMS_Digital_Archive` Drive Folder
+      </div>
+
+      <!-- Publishers Index -->
+      <div class="bg-white border-2 border-black p-5">
+        <h2 class="font-black text-lg uppercase tracking-tight border-b-2 border-black pb-2 mb-4">
+          Publishers Index (<span x-text="knownPublishers.length"></span>)
+        </h2>
+        <p class="text-xs text-neutral-600 mb-4">Click any publisher to list only books published by them.</p>
+        <div class="divide-y divide-neutral-200 max-h-[65vh] overflow-y-auto">
+          <template x-for="pub in knownPublishers" :key="pub">
+            <button @click="filterByPublisher(pub)" class="w-full py-2.5 px-2 flex items-center justify-between hover:bg-black hover:text-white text-left text-sm font-bold transition">
+              <span x-text="pub"></span>
+              <span class="font-mono text-xs" x-text="countBooksByPublisher(pub) + ' Books →'"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 03: DIGITAL ARCHIVE (DIRECT PDF UPLOAD + EMBEDDED READER)      -->
+    <!-- =================================================================== -->
+    <section x-show="activeTab === 'archive'" x-cloak class="no-print space-y-6">
+      <div class="bg-white border-2 border-black p-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="font-black text-lg uppercase tracking-tight">Digital Preservation Archive</h2>
+          <p class="text-xs text-neutral-600">Scanned PDFs of old, rare, or damaged books stored in Google Drive.</p>
+        </div>
+        <div x-show="isAdmin" class="flex flex-wrap gap-2">
+          <label class="cursor-pointer bg-swiss-red text-white font-mono text-xs font-bold uppercase px-4 py-2 border border-black">
+            + Upload PDF File Directly
+            <input type="file" accept="application/pdf" @change="handleDirectArchivePdfUpload($event)" class="hidden" />
+          </label>
+          <button @click="syncDriveFolder()" class="bg-black text-white font-mono text-xs font-bold uppercase px-4 py-2 border border-black">
+            ↻ Sync Drive Folder
           </button>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 border-t border-l border-black">
         <template x-for="item in digitalArchive" :key="item.Digital_ID">
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div class="bg-white border-r border-b border-black p-4 flex flex-col justify-between">
             <div>
-              <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
-                <span class="font-mono text-indigo-600 font-semibold" x-text="item.File_Format || 'PDF'"></span>
-                <span x-text="item.File_Size_MB ? item.File_Size_MB + ' MB' : ''"></span>
+              <div class="font-mono text-[10px] text-neutral-500 uppercase flex justify-between">
+                <span x-text="item.Digital_ID"></span>
+                <span x-text="item.File_Size_MB ? item.File_Size_MB + ' MB' : 'PDF'"></span>
               </div>
-              <h3 class="font-bold text-slate-800 text-base" x-text="getBookTitleById(item.Book_ID)"></h3>
-              <p class="text-xs text-slate-500 mt-1">
-                Reason: <span class="font-medium text-slate-700" x-text="item.Preservation_Reason"></span>
-              </p>
+              <h3 class="font-black text-base mt-1" x-text="item.Book_Title || item.File_Name"></h3>
             </div>
-            <div class="mt-4 pt-3 border-t border-slate-100 flex gap-2">
-              <button @click="openPdfViewer(item)" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2 rounded-lg">
-                📖 Read Inside Portal
+            <div class="mt-4 pt-3 border-t border-neutral-200 flex gap-2">
+              <button @click="activePdfUrl = item.Drive_View_URL; activePdfTitle = item.Book_Title"
+                      class="flex-1 bg-black text-white font-mono text-xs font-bold uppercase py-2">
+                Read PDF
               </button>
-              <a :href="item.Drive_Download_URL" target="_blank" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg">
-                ⬇️
-              </a>
+              <a :href="item.Drive_Download_URL" target="_blank" class="border border-black px-3 py-2 font-mono text-xs font-bold">↓</a>
             </div>
           </div>
         </template>
       </div>
     </section>
 
-    <!-- ================================================================= -->
-    <!-- TAB 3: LENDING (CHECK-OUT) & BORROWING (CHECK-IN) DESK            -->
-    <!-- ================================================================= -->
+    <!-- =================================================================== -->
+    <!-- VIEW 04: LENDING DESK (WITH BOOK NAME & CUSTOM WHATSAPP TEMPLATES)  -->
+    <!-- =================================================================== -->
     <section x-show="activeTab === 'lending'" x-cloak class="no-print space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-bold text-slate-900">📤 Issue Book (Check-Out)</h2>
-              <p class="text-xs text-slate-500">Scan Copy QR/Barcode or choose an available copy to lend.</p>
-            </div>
-            <button @click="startDeskScanner('checkout')" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
-              📷 Scan Copy QR
+
+        <!-- CHECK-OUT BOX -->
+        <div class="bg-white border-2 border-black p-5">
+          <div class="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+            <h2 class="font-black text-base uppercase">01 // Issue Book (Check-Out)</h2>
+            <button @click="startDeskScanner('checkout')" class="bg-swiss-red text-white font-mono text-xs font-bold uppercase px-3 py-1 border border-black">
+              📷 Scan QR
             </button>
           </div>
-          <div id="desk-scanner-checkout" class="w-full rounded overflow-hidden mb-3" x-show="deskScannerMode === 'checkout'"></div>
-          <div class="space-y-3">
+          <div id="desk-scanner-checkout" class="mb-3 border border-black" x-show="deskScannerMode === 'checkout'"></div>
+
+          <div class="space-y-3 text-xs">
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">1. Select or Scan Copy ID *</label>
-              <select x-model="checkoutForm.Copy_ID" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                <option value="">-- Choose Available Copy --</option>
-                <template x-for="c in availableCopiesList" :key="c.Copy_ID">
-                  <option :value="c.Copy_ID" x-text="c.Copy_ID + ' — ' + getBookTitleById(c.Book_ID) + ' (' + c.Copy_Call_Number + ')'"></option>
+              <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Select Available Copy (Accession — Book Title) *</label>
+              <select x-model="checkoutForm.Accession_Number" class="w-full border border-black px-3 py-2 text-sm bg-white font-medium">
+                <option value="">-- Select Book Copy to Lend --</option>
+                <template x-for="c in availableCopiesList" :key="c.Accession_Number">
+                  <option :value="c.Accession_Number"
+                          x-text="c.Accession_Number + ' — ' + getBookTitle(c.Book_ID) + ' [' + c.Call_Number + ']'"></option>
                 </template>
               </select>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">2. Select Borrower (Member) *</label>
-              <select x-model="checkoutForm.Member_ID" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                <option value="">-- Choose Member --</option>
+              <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Select Borrower (Member) *</label>
+              <select x-model="checkoutForm.Member_ID" class="w-full border border-black px-3 py-2 text-sm bg-white">
+                <option value="">-- Select Member --</option>
                 <template x-for="m in members" :key="m.Member_ID">
-                  <option :value="m.Member_ID" x-text="m.Full_Name + ' (' + m.Relationship + ' • Active Loans: ' + (m.Active_Loans_Count || 0) + '/' + (m.Max_Loan_Limit || 3) + ')'"></option>
+                  <option :value="m.Member_ID" x-text="m.Full_Name + ' (' + m.Relationship + ')'"></option>
                 </template>
               </select>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Loan Duration (Days)</label>
-                <input type="number" x-model="checkoutForm.Loan_Days" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+                <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Loan Days</label>
+                <input type="number" x-model="checkoutForm.Loan_Days" class="w-full border border-black px-3 py-1.5 text-sm" />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Notes (Optional)</label>
-                <input type="text" x-model="checkoutForm.Notes" placeholder="e.g. Handle with care" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+                <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Remarks</label>
+                <input type="text" x-model="checkoutForm.Notes" class="w-full border border-black px-3 py-1.5 text-sm" />
               </div>
             </div>
-            <button @click="submitCheckout()" :disabled="loading" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg text-sm shadow">
-              ✅ Issue Book Now
+            <button @click="submitCheckout()" :disabled="loading" class="w-full bg-black hover:bg-swiss-red text-white font-bold uppercase tracking-wider py-2.5 text-xs transition">
+              Issue Book & Prepare WhatsApp Receipt
             </button>
           </div>
         </div>
 
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-bold text-slate-900">📥 Return Book (Check-In)</h2>
-              <p class="text-xs text-slate-500">Scan returned book's QR sticker or select from active loans.</p>
-            </div>
-            <button @click="startDeskScanner('checkin')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
-              📷 Scan to Return
+        <!-- CHECK-IN BOX -->
+        <div class="bg-white border-2 border-black p-5">
+          <div class="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+            <h2 class="font-black text-base uppercase">02 // Return Book (Check-In)</h2>
+            <button @click="startDeskScanner('checkin')" class="bg-black text-white font-mono text-xs font-bold uppercase px-3 py-1 border border-black">
+              📷 Scan QR
             </button>
           </div>
-          <div id="desk-scanner-checkin" class="w-full rounded overflow-hidden mb-3" x-show="deskScannerMode === 'checkin'"></div>
-          <div class="space-y-3">
+          <div id="desk-scanner-checkin" class="mb-3 border border-black" x-show="deskScannerMode === 'checkin'"></div>
+
+          <div class="space-y-3 text-xs">
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">1. Select Active Loan / Copy ID *</label>
-              <select x-model="checkinForm.Copy_ID" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                <option value="">-- Select Lent Copy --</option>
-                <template x-for="t in activeTransactions" :key="t.Txn_ID">
-                  <option :value="t.Copy_ID" x-text="t.Copy_ID + ' — ' + getBookTitleById(t.Book_ID) + ' (Borrowed by ' + getMemberNameById(t.Member_ID) + ', Due: ' + String(t.Due_Date).substring(0,10) + ')'"></option>
+              <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Select Active Loan (Accession — Book Title — Borrower) *</label>
+              <select x-model="checkinForm.Accession_Number" class="w-full border border-black px-3 py-2 text-sm bg-white font-medium">
+                <option value="">-- Select Borrowed Book to Return --</option>
+                <template x-for="t in activeLoans" :key="t.Txn_ID">
+                  <option :value="t.Accession_Number"
+                          x-text="t.Accession_Number + ' — ' + t.Book_Title + ' (Taken by: ' + t.Member_Name + ')'"></option>
                 </template>
               </select>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Return Condition Check</label>
-                <select x-model="checkinForm.Return_Condition" class="w-full border rounded-lg px-3 py-1.5 text-sm bg-white">
+                <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Return Condition</label>
+                <select x-model="checkinForm.Return_Condition" class="w-full border border-black px-3 py-1.5 text-sm bg-white">
                   <option value="New">New</option>
                   <option value="Good">Good</option>
                   <option value="Worn">Worn</option>
@@ -299,597 +482,529 @@
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Return Notes</label>
-                <input type="text" x-model="checkinForm.Notes" placeholder="Condition remarks..." class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+                <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Notes</label>
+                <input type="text" x-model="checkinForm.Notes" class="w-full border border-black px-3 py-1.5 text-sm" />
               </div>
             </div>
-            <button @click="submitCheckin()" :disabled="loading" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg text-sm shadow">
-              📥 Complete Return & Update Shelf Status
+            <button @click="submitCheckin()" :disabled="loading" class="w-full bg-black hover:bg-emerald-700 text-white font-bold uppercase tracking-wider py-2.5 text-xs transition">
+              Complete Return
             </button>
           </div>
         </div>
       </div>
 
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <h3 class="text-base font-bold text-slate-900 mb-3">📋 Currently Lent Books (Who Has Which Book)</h3>
+      <!-- ACTIVE LOANS LEDGER WITH CUSTOM WHATSAPP TEMPLATE SELECTOR -->
+      <div class="bg-white border-2 border-black p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-3 mb-4">
+          <h3 class="font-black text-base uppercase">Active Loans & Custom WhatsApp Dispatches (<span x-text="activeLoans.length"></span>)</h3>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="font-mono uppercase text-[10px] text-neutral-500">WhatsApp Template:</span>
+            <select x-model="selectedWaTemplateKey" class="border border-black px-2.5 py-1 bg-white font-bold">
+              <template x-for="tpl in whatsappTemplates" :key="tpl.Config_Key">
+                <option :value="tpl.Config_Key" x-text="tpl.Config_Key"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse">
-            <thead class="bg-slate-100 text-slate-600 uppercase">
+            <thead class="bg-neutral-100 border-b border-black font-mono text-[10px] uppercase">
               <tr>
-                <th class="p-3">Copy ID</th>
-                <th class="p-3">Book Title</th>
-                <th class="p-3">Borrower</th>
-                <th class="p-3">Issued On</th>
-                <th class="p-3">Due Date</th>
-                <th class="p-3">Status</th>
-                <th class="p-3 text-right">Actions</th>
+                <th class="p-2.5">Accession</th>
+                <th class="p-2.5">Book Title</th>
+                <th class="p-2.5">Borrower</th>
+                <th class="p-2.5">Issued</th>
+                <th class="p-2.5">Due Date</th>
+                <th class="p-2.5 text-right">Actions & WhatsApp</th>
               </tr>
             </thead>
-            <tbody class="divide-y">
-              <template x-for="t in activeTransactions" :key="t.Txn_ID">
-                <tr class="hover:bg-slate-50">
-                  <td class="p-3 font-mono font-bold" x-text="t.Copy_ID"></td>
-                  <td class="p-3 font-semibold text-slate-900" x-text="getBookTitleById(t.Book_ID)"></td>
-                  <td class="p-3" x-text="getMemberNameById(t.Member_ID)"></td>
-                  <td class="p-3" x-text="String(t.Issue_Date).substring(0, 10)"></td>
-                  <td class="p-3 font-semibold" :class="isOverdue(t.Due_Date) ? 'text-red-600' : 'text-slate-800'" x-text="String(t.Due_Date).substring(0, 10)"></td>
-                  <td class="p-3">
-                    <span :class="isOverdue(t.Due_Date) ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'" class="px-2 py-0.5 rounded font-bold text-[10px]"
-                          x-text="isOverdue(t.Due_Date) ? 'OVERDUE' : 'LENT (Renewals: ' + (t.Renewal_Count || 0) + ')'"></span>
-                  </td>
-                  <td class="p-3 text-right space-x-1">
-                    <button @click="renewActiveLoan(t)" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded font-semibold">+7d Renew</button>
-                    <button @click="quickReturnFromTable(t)" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded font-semibold">Return</button>
+            <tbody class="divide-y divide-neutral-200">
+              <template x-for="t in activeLoans" :key="t.Txn_ID">
+                <tr>
+                  <td class="p-2.5 font-mono font-bold" x-text="t.Accession_Number"></td>
+                  <td class="p-2.5 font-bold text-black" x-text="t.Book_Title"></td>
+                  <td class="p-2.5" x-text="t.Member_Name"></td>
+                  <td class="p-2.5 font-mono" x-text="String(t.Issue_Date).substring(0,10)"></td>
+                  <td class="p-2.5 font-mono font-bold" :class="isOverdue(t.Due_Date) ? 'text-swiss-red' : ''" x-text="String(t.Due_Date).substring(0,10)"></td>
+                  <td class="p-2.5 text-right space-x-1">
+                    <button @click="sendCustomWhatsApp(t)" class="bg-emerald-700 text-white font-mono text-[10px] font-bold uppercase px-2.5 py-1">
+                      💬 WhatsApp
+                    </button>
+                    <button @click="renewLoan(t)" class="border border-black font-mono text-[10px] font-bold uppercase px-2 py-1">
+                      +7d
+                    </button>
+                    <button @click="quickReturn(t)" class="bg-black text-white font-mono text-[10px] font-bold uppercase px-2 py-1">
+                      Return
+                    </button>
                   </td>
                 </tr>
               </template>
-              <tr x-show="activeTransactions.length === 0">
-                <td colspan="7" class="p-6 text-center text-slate-400">All books are currently safe in the library!</td>
-              </tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- ================================================================= -->
-    <!-- TAB 4: MEMBERS / PEOPLE & BORROWING HISTORY                       -->
-    <!-- ================================================================= -->
-    <section x-show="activeTab === 'members'" x-cloak class="no-print space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-base font-bold text-slate-900 mb-3">➕ Add / Update Member</h3>
-          <div class="space-y-3 text-xs">
-            <div>
-              <label class="block font-semibold text-slate-600 mb-1">Full Name *</label>
-              <input type="text" x-model="memberForm.Full_Name" placeholder="e.g. Rahul Nair" class="w-full border rounded-lg px-3 py-2 text-sm" />
+    <!-- =================================================================== -->
+    <!-- VIEW 05: 24-FIELD ADD / EDIT BOOK FORM + RESCAN ISBN + DDC GUIDE    -->
+    <!-- =================================================================== -->
+    <section x-show="activeTab === 'form'" x-cloak class="no-print max-w-5xl mx-auto">
+      <div class="bg-white border-2 border-black p-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black pb-4 mb-6">
+          <div>
+            <h2 class="font-black text-xl uppercase tracking-tight" x-text="formBook.isEditMode ? 'Edit Book Record // ' + formBook.Book_ID : 'Catalog New Book // 24-Field Record'"></h2>
+            <p class="font-mono text-[11px] text-neutral-500">Auto-fill via ISBN Barcode or Gemini Multilingual OCR (English / മലയാളം / العربية)</p>
+          </div>
+          <button @click="resetFormBook()" class="border border-black px-3 py-1 font-mono text-xs uppercase font-bold">Reset Form</button>
+        </div>
+
+        <!-- TOP CAPTURE STRIP: ISBN SCAN / RESCAN + FRONT COVER + BACK COVER + PDF ARCHIVE -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-neutral-50 p-4 border border-black">
+          <!-- 1. ISBN & Re-Scan -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase font-bold mb-1">08 // ISBN & Camera Scan</label>
+            <div class="flex gap-1">
+              <input type="text" x-model="formBook.ISBN" placeholder="ISBN-13 / 10" class="w-full border border-black px-2.5 py-1.5 text-xs font-mono bg-white" />
+              <button type="button" @click="rescanIsbn()" title="Re-Scan ISBN Barcode"
+                      class="bg-swiss-red text-white font-mono text-[10px] font-bold uppercase px-2.5 py-1.5 border border-black whitespace-nowrap">
+                📷 Re-Scan
+              </button>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block font-semibold text-slate-600 mb-1">Relationship</label>
-                <select x-model="memberForm.Relationship" class="w-full border rounded-lg px-2 py-2 bg-white">
-                  <option value="Family">Family</option>
-                  <option value="Friend">Friend</option>
-                  <option value="Neighbour">Neighbour</option>
-                  <option value="Owner">Owner</option>
-                </select>
-              </div>
-              <div>
-                <label class="block font-semibold text-slate-600 mb-1">Max Loan Limit</label>
-                <input type="number" x-model="memberForm.Max_Loan_Limit" class="w-full border rounded-lg px-2 py-2" />
-              </div>
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-600 mb-1">WhatsApp Phone (with Country Code, e.g. 919876543210)</label>
-              <input type="text" x-model="memberForm.Phone_WhatsApp" placeholder="919876543210" class="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-600 mb-1">Email (Optional)</label>
-              <input type="email" x-model="memberForm.Email" class="w-full border rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <button @click="saveMember()" :disabled="loading" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 rounded-lg text-sm shadow">
-              💾 Save Member
+            <div id="form-isbn-reader" class="mt-2 border border-black" x-show="formScannerActive"></div>
+          </div>
+
+          <!-- 2. Front Cover Image (Field 22) -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase font-bold mb-1">22 // Front Cover Photo</label>
+            <label class="cursor-pointer block border border-black bg-white text-center py-1.5 text-xs font-bold uppercase hover:bg-black hover:text-white transition">
+              📸 Snap Front Cover
+              <input type="file" accept="image/*" capture="environment" @change="handleCoverUpload($event, 'front')" class="hidden" />
+            </label>
+            <div x-show="formBook.frontCoverBase64 || formBook.Cover_Image_URL" class="mt-1 text-[10px] font-mono text-emerald-700 truncate">✓ Front Cover Ready</div>
+          </div>
+
+          <!-- 3. Back Cover Image (Field 24) -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase font-bold mb-1">24 // Back Cover Photo</label>
+            <label class="cursor-pointer block border border-black bg-white text-center py-1.5 text-xs font-bold uppercase hover:bg-black hover:text-white transition">
+              📸 Snap Back Cover
+              <input type="file" accept="image/*" capture="environment" @change="handleCoverUpload($event, 'back')" class="hidden" />
+            </label>
+            <div x-show="formBook.backCoverBase64 || formBook.Back_Image_URL" class="mt-1 text-[10px] font-mono text-emerald-700 truncate">✓ Back Cover Ready</div>
+          </div>
+
+          <!-- 4. Auto-Extract Trigger -->
+          <div class="flex flex-col justify-end">
+            <button type="button" @click="runAiPipeline()" :disabled="loading"
+                    class="w-full bg-black hover:bg-swiss-red text-white font-mono text-xs font-bold uppercase py-2 px-3 border border-black transition">
+              ⚡ Auto-Fetch Metadata
             </button>
           </div>
         </div>
 
-        <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-base font-bold text-slate-900 mb-3">👥 Library Members Directory</h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600 uppercase">
-                <tr>
-                  <th class="p-2.5">Name</th>
-                  <th class="p-2.5">Group</th>
-                  <th class="p-2.5">WhatsApp</th>
-                  <th class="p-2.5">Active Loans</th>
-                  <th class="p-2.5">Trust Score</th>
-                  <th class="p-2.5 text-right">History</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <template x-for="m in members" :key="m.Member_ID">
-                  <tr class="hover:bg-slate-50">
-                    <td class="p-2.5 font-bold text-slate-900" x-text="m.Full_Name"></td>
-                    <td class="p-2.5" x-text="m.Relationship"></td>
-                    <td class="p-2.5 font-mono" x-text="m.Phone_WhatsApp || '—'"></td>
-                    <td class="p-2.5 font-semibold" x-text="(m.Active_Loans_Count || 0) + ' / ' + (m.Max_Loan_Limit || 3)"></td>
-                    <td class="p-2.5">
-                      <span class="px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700" x-text="(m.Trust_Score || 100) + '%'"></span>
-                    </td>
-                    <td class="p-2.5 text-right">
-                      <button @click="openMemberHistoryModal(m)" class="text-blue-600 hover:underline font-semibold">View Log →</button>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
+        <!-- 24-FIELD SWISS FORM GRID -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
 
-    <!-- ================================================================= -->
-    <!-- TAB 5: ZERO-API WHATSAPP REMINDER QUEUE                           -->
-    <!-- ================================================================= -->
-    <section x-show="activeTab === 'whatsapp'" x-cloak class="no-print">
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900">💬 1-Tap WhatsApp Due & Overdue Reminder Queue</h2>
-          <p class="text-xs text-slate-500">Zero API fees. Clicking "Send WhatsApp" opens WhatsApp directly to the borrower's chat with a pre-filled message.</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <select x-model="waLang" class="border rounded-lg px-3 py-1.5 text-xs bg-white font-semibold">
-            <option value="en">Message Language: English</option>
-            <option value="ml">Message Language: മലയാളം (Malayalam)</option>
-          </select>
-          <button @click="loadWhatsAppQueue()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg">
-            🔄 Refresh Queue
-          </button>
-        </div>
-      </div>
-
-      <div class="space-y-3">
-        <template x-for="item in whatsappQueue" :key="item.Txn_ID">
-          <div class="bg-white p-4 rounded-xl shadow-sm border flex flex-wrap items-center justify-between gap-4"
-               :class="item.Urgency === 'OVERDUE' ? 'border-red-300 bg-red-50/30' : 'border-amber-300'">
-            <div>
-              <div class="flex items-center gap-2">
-                <span :class="item.Urgency === 'OVERDUE' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'"
-                      class="text-[10px] font-bold px-2 py-0.5 rounded" x-text="item.Urgency"></span>
-                <h3 class="font-bold text-slate-900 text-sm" x-text="item.Member_Name + ' — ' + item.Book_Title"></h3>
-                <span class="font-mono text-xs text-slate-500" x-text="'(' + item.Call_Number + ')'"></span>
-              </div>
-              <p class="text-xs text-slate-600 mt-1">
-                Due Date: <strong x-text="String(item.Due_Date).substring(0, 10)"></strong> •
-                Last Reminded: <span x-text="String(item.Last_Reminded_Date).substring(0, 10) || 'Never'"></span>
-              </p>
-            </div>
-            <button @click="sendWhatsAppRedirect(item)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">
-              📲 Send WhatsApp Redirect
-            </button>
-          </div>
-        </template>
-        <div x-show="whatsappQueue.length === 0" class="bg-white p-8 rounded-xl border text-center text-slate-400 text-sm">
-          🎉 No overdue or upcoming due reminders needed right now!
-        </div>
-      </div>
-    </section>
-
-    <!-- ================================================================= -->
-    <!-- TAB 6: SPINE CALL NUMBER & QR CODE LABEL PRINTER                  -->
-    <!-- ================================================================= -->
-    <section x-show="activeTab === 'labels'" x-cloak>
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap items-center justify-between gap-4 no-print">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900">🏷️ Printable Spine Call Number & QR Code Stickers</h2>
-          <p class="text-xs text-slate-500">Prints combined two-part labels: Stacked Spine Call Number on the left + Scannable QR Code & Location on the right.</p>
-        </div>
-        <div class="flex gap-2">
-          <button @click="renderAllStickers()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-lg">
-            🔄 Generate QR Codes (<span x-text="copies.length"></span> Copies)
-          </button>
-          <button @click="window.print()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-5 py-2 rounded-lg shadow">
-            🖨️ Print Sticker Sheet (A4 / PDF)
-          </button>
-        </div>
-      </div>
-
-      <div id="printable-label-area" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <template x-for="copy in copies" :key="copy.Copy_ID">
-          <div class="sticker-card bg-white border-2 border-slate-800 rounded-lg p-3 flex items-center justify-between gap-3">
-            <div class="border-r-2 border-dashed border-slate-400 pr-3 min-w-[85px] text-center font-mono font-extrabold text-xs leading-tight text-slate-900">
-              <template x-for="part in formatStackedCallNo(copy.Copy_Call_Number)">
-                <div x-text="part"></div>
-              </template>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">SKD HOME LIBRARY</div>
-              <div class="text-xs font-bold text-slate-900 truncate" x-text="getBookTitleById(copy.Book_ID)"></div>
-              <div class="text-xs font-mono font-bold text-blue-800 mt-0.5" x-text="copy.Copy_ID"></div>
-              <div class="text-[10px] text-slate-600 mt-0.5" x-text="copy.Room + ' • ' + copy.Shelf + ' • ' + copy.Row_Position"></div>
-            </div>
-            <div class="w-16 h-16 flex items-center justify-center bg-white p-1" :id="'qr-' + copy.Copy_ID"></div>
-          </div>
-        </template>
-      </div>
-    </section>
-
-    <!-- ================================================================= -->
-    <!-- TAB 7: ADD BOOK (MULTI-SERVER ISBN + COVER/BLURB DRIVE + LENS)    -->
-    <!-- ================================================================= -->
-    <section x-show="activeTab === 'addBook'" x-cloak class="max-w-4xl mx-auto no-print">
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-xl font-bold text-slate-900 mb-1">➕ Add Book to Library</h2>
-        <p class="text-xs text-slate-500 mb-5">
-          1. Scan ISBN Barcode to auto-fill from 5 global book servers. 2. Snap & compress Cover/Blurb photos to Google Drive. 3. Use Google Lens for instant Blurb & Malayalam/Arabic text copy-paste.
-        </p>
-
-        <!-- STEP 1: BARCODE SCANNER & MULTI-SERVER ISBN LOOKUP -->
-        <div class="border border-blue-200 rounded-xl p-4 bg-blue-50/50 mb-6">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div>
-              <span class="text-xs font-bold uppercase tracking-wider text-blue-900">1. Scan Barcode or Search ISBN Servers</span>
-              <p class="text-[11px] text-slate-600">Queries Google Books, Open Library Data/Editions/Works, and Internet Archive simultaneously.</p>
-            </div>
-            <button @click="toggleBarcodeScanner()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg font-bold shadow"
-                    x-text="scannerActive ? '✕ Stop Camera Scanner' : '📷 Scan ISBN Barcode'"></button>
-          </div>
-
-          <div id="barcode-reader" class="w-full max-w-md mx-auto rounded-lg overflow-hidden mb-3" x-show="scannerActive"></div>
-
-          <div class="flex flex-wrap sm:flex-nowrap gap-2">
-            <input type="text" x-model="isbnLookupInput" @keyup.enter="fetchIsbnMetadata()"
-                   placeholder="Scan barcode or enter ISBN-13 / ISBN-10 (or Title)..."
-                   class="flex-1 border border-slate-300 rounded-lg px-3.5 py-2 text-sm bg-white font-mono" />
-            <button @click="fetchIsbnMetadata()" :disabled="loading"
-                    class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2 rounded-lg shadow whitespace-nowrap">
-              🔍 Auto-Fetch Book Details
-            </button>
-          </div>
-
-          <!-- Server Match Banner -->
-          <div x-show="lookupSources.length > 0" x-cloak class="mt-2.5 text-xs text-emerald-800 bg-emerald-100/80 border border-emerald-300 px-3 py-1.5 rounded-lg flex items-center justify-between">
-            <span>✅ Auto-filled from: <strong x-text="lookupSources.join(' + ')"></strong></span>
-          </div>
-        </div>
-
-        <!-- STEP 2: COVER PHOTO & BLURB PHOTO UPLOADER (COMPRESS + DRIVE + GOOGLE LENS) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-
-          <!-- CARD A: FRONT COVER PHOTO -->
-          <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700">2A. Front Cover Photo</span>
-                <label class="cursor-pointer text-xs bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">
-                  📸 Upload Cover
-                  <input type="file" accept="image/*" capture="environment" @change="handleSingleImageUpload($event, 'cover')" class="hidden" />
-                </label>
-              </div>
-              <p class="text-[11px] text-slate-500 mb-3">Compressed & saved to `/LMS_Covers` in Google Drive.</p>
-
-              <template x-if="formBook.Cover_Image_URL">
-                <div class="flex items-center gap-3 bg-white p-2 rounded-lg border">
-                  <img :src="formBook.Cover_Image_URL" class="w-16 h-20 object-contain rounded border" />
-                  <div class="flex-1 min-w-0">
-                    <div class="text-[11px] font-semibold text-emerald-700">✓ Cover Ready</div>
-                    <a x-show="coverLensUrl" :href="coverLensUrl" target="_blank"
-                       class="mt-1 inline-block bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold px-2.5 py-1 rounded">
-                      🔍 Open Cover in Google Lens
-                    </a>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <!-- CARD B: BACK COVER / BLURB PHOTO + 1-CLICK GOOGLE LENS -->
-          <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700">2B. Blurb / Back Photo (Google Lens)</span>
-                <label class="cursor-pointer text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-semibold shadow-sm">
-                  📸 Upload Blurb Photo
-                  <input type="file" accept="image/*" capture="environment" @change="handleSingleImageUpload($event, 'blurb')" class="hidden" />
-                </label>
-              </div>
-              <p class="text-[11px] text-slate-500 mb-3">Upload back cover/flap to Drive & open in Google Lens to copy blurb text in any language.</p>
-
-              <template x-if="formBook.Blurb_Image_URL">
-                <div class="flex items-center gap-3 bg-white p-2 rounded-lg border">
-                  <img :src="formBook.Blurb_Image_URL" class="w-16 h-20 object-contain rounded border" />
-                  <div class="flex-1 min-w-0 space-y-1">
-                    <div class="text-[11px] font-semibold text-emerald-700">✓ Stored in Google Drive</div>
-                    <a x-show="blurbLensUrl" :href="blurbLensUrl" target="_blank"
-                       class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow">
-                      🔍 Extract Text with Google Lens ↗
-                    </a>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 3: BOOK DETAILS & CALL NUMBER FORM -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-200 pt-5">
+          <!-- Field 1: Book ID -->
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="text-xs font-semibold text-slate-600">Title (English) *</label>
-              <button type="button" @click="pasteIntoField('Title')" class="text-[10px] text-blue-600 hover:underline font-semibold">📋 Paste</button>
-            </div>
-            <input type="text" x-model="formBook.Title" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">01 // Book ID (Auto)</label>
+            <input type="text" x-model="formBook.Book_ID" placeholder="Auto-generated" readonly class="w-full border border-neutral-300 bg-neutral-100 px-3 py-2 font-mono" />
           </div>
 
+          <!-- Field 2a: Book Title (English) -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">02A // Book Title (English / Transliterated) *</label>
+            <input type="text" x-model="formBook.Title_English" class="w-full border border-black px-3 py-2 font-bold text-sm" />
+          </div>
+
+          <!-- Field 2b: Original Title -->
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="text-xs font-semibold text-slate-600">Original Title (മലയാളം / العربية)</label>
-              <button type="button" @click="pasteIntoField('Original_Title')" class="text-[10px] text-blue-600 hover:underline font-semibold">📋 Paste Lens</button>
-            </div>
-            <input type="text" x-model="formBook.Original_Title" placeholder="e.g. ആടുജീവിതം" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">02B // Original Title (മലയാളം / العربية)</label>
+            <input type="text" x-model="formBook.Title_Original" placeholder="e.g. ബാല്യകാലസഖി" class="w-full border border-black px-3 py-2 text-sm" />
           </div>
 
+          <!-- Field 3: Book Type -->
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="text-xs font-semibold text-slate-600">Author(s) *</label>
-              <button type="button" @click="pasteIntoField('Authors')" class="text-[10px] text-blue-600 hover:underline font-semibold">📋 Paste</button>
-            </div>
-            <input type="text" x-model="formBook.Authors" @input="updateAutoCallPreview()" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">03 // Book Type</label>
+            <select x-model="formBook.Book_Type" class="w-full border border-black px-3 py-2 bg-white">
+              <option value="Normal Book">Normal Book</option>
+              <option value="Series">Series</option>
+              <option value="Volume">Volume</option>
+            </select>
           </div>
 
-          <!-- HYBRID CALL NUMBER SELECTOR -->
-          <div class="md:col-span-3 bg-slate-100 p-3.5 rounded-xl border border-slate-300">
+          <!-- Field 4: Series Name -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">04 // Series Name</label>
+            <input type="text" x-model="formBook.Series_Name" placeholder="If part of series..." class="w-full border border-black px-3 py-2" />
+          </div>
+
+          <!-- Field 5: Volume Number -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">05 // Volume Number</label>
+            <input type="text" x-model="formBook.Volume_Number" placeholder="e.g. Vol. 2" class="w-full border border-black px-3 py-2" />
+          </div>
+
+          <!-- Field 9: Edition -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">09 // Edition</label>
+            <input type="text" x-model="formBook.Edition" placeholder="e.g. 1st Edition" class="w-full border border-black px-3 py-2" />
+          </div>
+
+          <!-- Field 6: Author (Dropdown / Auto-Suggest from Previously Entered) -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">06 // Author(s) (Select or Type New) *</label>
+            <input type="text" list="authors-datalist" x-model="formBook.Authors" @input="refreshAutoCallNo()" placeholder="Choose existing or type new author..." class="w-full border border-black px-3 py-2 font-semibold" />
+            <datalist id="authors-datalist">
+              <template x-for="aut in knownAuthors" :key="aut">
+                <option :value="aut"></option>
+              </template>
+            </datalist>
+          </div>
+
+          <!-- Field 7: Publisher (Dropdown / Auto-Suggest from Previously Entered) -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">07 // Publisher (Select or Type New)</label>
+            <input type="text" list="publishers-datalist" x-model="formBook.Publisher" placeholder="Choose existing or type new publisher..." class="w-full border border-black px-3 py-2" />
+            <datalist id="publishers-datalist">
+              <template x-for="pub in knownPublishers" :key="pub">
+                <option :value="pub"></option>
+              </template>
+            </datalist>
+          </div>
+
+          <!-- Field 10: Language (Dropdown + Quick Add) -->
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="font-mono text-[10px] uppercase text-neutral-500">10 // Language</label>
+              <button type="button" @click="promptNewConfig('Language')" class="font-mono text-[10px] text-swiss-red font-bold">+ Add</button>
+            </div>
+            <select x-model="formBook.Language" @change="refreshAutoCallNo()" class="w-full border border-black px-2.5 py-2 bg-white">
+              <template x-for="lang in configList('Language')" :key="lang">
+                <option :value="lang" x-text="lang"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Field 11: Category / Genre (Dropdown + Quick Add) -->
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="font-mono text-[10px] uppercase text-neutral-500">11 // Category / Genre</label>
+              <button type="button" @click="promptNewConfig('Category_Genre')" class="font-mono text-[10px] text-swiss-red font-bold">+ Add</button>
+            </div>
+            <select x-model="formBook.Category_Genre" @change="refreshAutoCallNo()" class="w-full border border-black px-2.5 py-2 bg-white">
+              <template x-for="cat in configList('Category_Genre')" :key="cat">
+                <option :value="cat" x-text="cat"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Field 12: Publication Year -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">12 // Publication Year</label>
+            <input type="number" x-model="formBook.Publish_Year" @input="refreshAutoCallNo()" placeholder="YYYY" class="w-full border border-black px-3 py-2 font-mono" />
+          </div>
+
+          <!-- Field 13: Number of Pages -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">13 // Pages</label>
+            <input type="number" x-model="formBook.Pages" class="w-full border border-black px-3 py-2 font-mono" />
+          </div>
+
+          <!-- CALL NUMBER BAR WITH DDC GUIDE CHART BUTTON -->
+          <div class="md:col-span-4 bg-neutral-100 border border-black p-3.5">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <label class="text-xs font-bold text-slate-800">🏷️ Call Number Configuration (Auto-Generate or Manual Override)</label>
-              <div class="flex gap-2 text-xs">
-                <button type="button" @click="setCallNumberMode('Auto')" :class="formBook.Call_Number_Mode === 'Auto' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'" class="px-2.5 py-1 rounded border font-semibold">Auto Home-Code</button>
-                <button type="button" @click="setCallNumberMode('DDC')" :class="formBook.Call_Number_Mode === 'DDC' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'" class="px-2.5 py-1 rounded border font-semibold">Auto Dewey (DDC)</button>
-                <button type="button" @click="setCallNumberMode('Manual')" :class="formBook.Call_Number_Mode === 'Manual' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700'" class="px-2.5 py-1 rounded border font-semibold">✏️ Manual Input</button>
-              </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-              <input type="text" x-model="formBook.Call_Number" :readonly="formBook.Call_Number_Mode !== 'Manual'"
-                     :class="formBook.Call_Number_Mode !== 'Manual' ? 'bg-slate-200 text-slate-700' : 'bg-white'"
-                     class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono font-bold" />
-              <span class="text-[11px] text-slate-500">
-                Copy 1 spine label: <strong class="font-mono text-slate-800" x-text="(formBook.Call_Number || 'GEN') + ' c.1'"></strong>
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">ISBN-13 / ISBN-10</label>
-            <div class="flex gap-2">
-              <input type="text" x-model="formBook.ISBN_13" placeholder="ISBN-13" class="w-1/2 border rounded-lg px-2.5 py-1.5 text-xs font-mono" />
-              <input type="text" x-model="formBook.ISBN_10" placeholder="ISBN-10" class="w-1/2 border rounded-lg px-2.5 py-1.5 text-xs font-mono" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Language & Pages</label>
-            <div class="flex gap-2">
-              <input type="text" x-model="formBook.Language" @input="updateAutoCallPreview()" placeholder="Language" class="w-2/3 border rounded-lg px-3 py-1.5 text-sm" />
-              <input type="number" x-model="formBook.Pages" placeholder="Pages" class="w-1/3 border rounded-lg px-2 py-1.5 text-sm" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Publisher & Year</label>
-            <div class="flex gap-2">
-              <input type="text" x-model="formBook.Publisher" placeholder="Publisher" class="w-2/3 border rounded-lg px-3 py-1.5 text-sm" />
-              <input type="number" x-model="formBook.Publish_Year" @input="updateAutoCallPreview()" placeholder="Year" class="w-1/3 border rounded-lg px-2 py-1.5 text-sm" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Genres / Subjects</label>
-            <input type="text" x-model="formBook.Genres" @input="updateAutoCallPreview()" class="w-full border rounded-lg px-3 py-1.5 text-sm" />
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Physical Location (Room / Shelf / Row)</label>
-            <div class="grid grid-cols-3 gap-1.5">
-              <input type="text" x-model="formBook.Room" placeholder="Room" class="border rounded-lg px-2 py-1.5 text-xs" />
-              <input type="text" x-model="formBook.Shelf" placeholder="Shelf" class="border rounded-lg px-2 py-1.5 text-xs" />
-              <input type="text" x-model="formBook.Row_Position" placeholder="Row" class="border rounded-lg px-2 py-1.5 text-xs" />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Condition & Price (INR)</label>
-            <div class="flex gap-2">
-              <select x-model="formBook.Condition" class="w-2/3 border rounded-lg px-2 py-1.5 text-xs bg-white">
-                <option value="New">New</option>
-                <option value="Good">Good</option>
-                <option value="Worn">Worn</option>
-                <option value="Damaged">Damaged</option>
-                <option value="Fragile/Archival Only">Fragile/Archival Only</option>
-              </select>
-              <input type="number" x-model="formBook.Purchase_Price" placeholder="₹ Price" class="w-1/3 border rounded-lg px-2 py-1.5 text-xs" />
-            </div>
-          </div>
-
-          <!-- BLURB / DESCRIPTION WITH GOOGLE LENS HELPER -->
-          <div class="md:col-span-3">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-              <label class="text-xs font-semibold text-slate-600">Brief Description / Back-Cover Blurb</label>
               <div class="flex items-center gap-2">
-                <a x-show="blurbLensUrl" :href="blurbLensUrl" target="_blank"
-                   class="text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-semibold hover:bg-indigo-100">
-                  🔍 1. Open Uploaded Blurb in Google Lens ↗
-                </a>
-                <a href="https://lens.google.com/" target="_blank" x-show="!blurbLensUrl"
-                   class="text-[11px] bg-slate-100 text-slate-700 border px-2 py-0.5 rounded font-semibold hover:bg-slate-200">
-                  🔍 Open Google Lens ↗
-                </a>
-                <button type="button" @click="pasteIntoField('Description')"
-                        class="text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-0.5 rounded font-bold shadow-sm">
-                  📋 2. Paste Copied Text into Blurb
+                <span class="font-mono text-xs font-bold uppercase">Call Number & Classification</span>
+                <button type="button" @click="showDdcModal = true" class="bg-swiss-red text-white font-mono text-[10px] font-bold uppercase px-2 py-0.5">
+                  ? Open DDC Guide Chart
                 </button>
               </div>
+              <div class="flex border border-black divide-x divide-black text-[11px] font-mono font-bold">
+                <button type="button" @click="setCallMode('Auto')" :class="formBook.Call_Number_Mode === 'Auto' ? 'bg-black text-white' : 'bg-white'" class="px-2.5 py-1">AUTO HOME</button>
+                <button type="button" @click="setCallMode('DDC')" :class="formBook.Call_Number_Mode === 'DDC' ? 'bg-black text-white' : 'bg-white'" class="px-2.5 py-1">AUTO DDC</button>
+                <button type="button" @click="setCallMode('Manual')" :class="formBook.Call_Number_Mode === 'Manual' ? 'bg-swiss-red text-white' : 'bg-white'" class="px-2.5 py-1">MANUAL</button>
+              </div>
             </div>
-            <textarea x-model="formBook.Description" rows="4"
-                      placeholder="Auto-filled from ISBN servers, or copy text using Google Lens and click 'Paste Copied Text into Blurb'..."
-                      class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+            <input type="text" x-model="formBook.Call_Number" class="w-full border border-black px-3 py-1.5 font-mono font-bold text-sm bg-white" />
           </div>
 
-          <div class="md:col-span-3">
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Google Drive Digital Archive Scan URL (Optional)</label>
-            <input type="text" x-model="formBook.Digital_Drive_URL" placeholder="Paste Drive PDF link if this book has a scanned copy..." class="w-full border rounded-lg px-3 py-1.5 text-xs" />
+          <!-- Field 14: Book Format -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">14 // Book Format</label>
+            <select x-model="formBook.Book_Format" class="w-full border border-black px-2.5 py-2 bg-white">
+              <option value="Physical">Physical</option>
+              <option value="E-book">E-book</option>
+              <option value="Audiobook">Audiobook</option>
+              <option value="Physical + PDF Scan">Physical + PDF Scan</option>
+            </select>
+          </div>
+
+          <!-- Field 15: Shelf Location (Dropdown + Quick Add) -->
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="font-mono text-[10px] uppercase text-neutral-500">15 // Shelf Location</label>
+              <button type="button" @click="promptNewConfig('Shelf_Location')" class="font-mono text-[10px] text-swiss-red font-bold">+ Add</button>
+            </div>
+            <select x-model="formBook.Shelf_Location" class="w-full border border-black px-2.5 py-2 bg-white">
+              <template x-for="loc in configList('Shelf_Location')" :key="loc">
+                <option :value="loc" x-text="loc"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Field 16: Date Acquired -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">16 // Date Acquired</label>
+            <input type="date" x-model="formBook.Date_Acquired" class="w-full border border-black px-2.5 py-1.5 font-mono" />
+          </div>
+
+          <!-- Field 17: Purchase Price -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">17 // Purchase Price (₹)</label>
+            <input type="number" x-model="formBook.Purchase_Price" placeholder="INR" class="w-full border border-black px-3 py-2 font-mono" />
+          </div>
+
+          <!-- Field 18: Reading Status -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">18 // Reading Status</label>
+            <select x-model="formBook.Reading_Status" class="w-full border border-black px-2.5 py-2 bg-white">
+              <option value="Unread">Unread</option>
+              <option value="Reading">Reading</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+
+          <!-- Field 19: Book Condition -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">19 // Book Condition</label>
+            <select x-model="formBook.Book_Condition" class="w-full border border-black px-2.5 py-2 bg-white">
+              <option value="New">New</option>
+              <option value="Good">Good</option>
+              <option value="Worn">Worn</option>
+              <option value="Damaged">Damaged</option>
+              <option value="Fragile">Fragile (Archival)</option>
+            </select>
+          </div>
+
+          <!-- Field 20: Rating -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">20 // Rating (1–5 ★)</label>
+            <select x-model="formBook.Rating" class="w-full border border-black px-2.5 py-2 bg-white">
+              <option value="">Unrated</option>
+              <option value="5">★★★★★ (5)</option>
+              <option value="4">★★★★ (4)</option>
+              <option value="3">★★★ (3)</option>
+              <option value="2">★★ (2)</option>
+              <option value="1">★ (1)</option>
+            </select>
+          </div>
+
+          <!-- Attach Digital PDF Archive Directly in Form -->
+          <div>
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">Attach Archive PDF File</label>
+            <label class="cursor-pointer block border border-black bg-neutral-100 text-center py-2 font-mono text-[11px] font-bold hover:bg-black hover:text-white transition">
+              <span x-text="formBook.pdfFileName ? '✓ ' + formBook.pdfFileName : '📄 Choose PDF File'"></span>
+              <input type="file" accept="application/pdf" @change="handleFormPdfSelect($event)" class="hidden" />
+            </label>
+          </div>
+
+          <!-- Field 21: Notes / Remarks -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">21 // Notes / Remarks</label>
+            <textarea x-model="formBook.Notes_Remarks" rows="2" class="w-full border border-black px-3 py-1.5"></textarea>
+          </div>
+
+          <!-- Field 23: Blurb / Description -->
+          <div class="md:col-span-2">
+            <label class="block font-mono text-[10px] uppercase text-neutral-500 mb-1">23 // Blurb / Synopsis</label>
+            <textarea x-model="formBook.Description_Blurb" rows="2" class="w-full border border-black px-3 py-1.5"></textarea>
           </div>
         </div>
 
-        <div class="mt-6 flex justify-end gap-3">
-          <button @click="resetFormBook()" class="px-4 py-2 rounded-lg border text-xs font-semibold text-slate-600">Clear Form</button>
-          <button @click="saveBookToDatabase()" :disabled="loading" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-bold shadow">
-            💾 Save Book & Generate Copy ID
+        <div class="mt-6 pt-4 border-t-2 border-black flex justify-end gap-3">
+          <button type="button" @click="switchTab('catalog')" class="border border-black px-5 py-2.5 font-mono text-xs font-bold uppercase">Cancel</button>
+          <button type="button" @click="saveBookRecord()" :disabled="loading"
+                  class="bg-swiss-red hover:bg-black text-white px-8 py-2.5 font-mono text-xs font-bold uppercase tracking-wider border border-black transition">
+            Save Book Record
           </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 06: SIMPLIFIED SMALL STICKER PRINTER (QR + CALL + ACCESSION)   -->
+    <!-- =================================================================== -->
+    <section x-show="activeTab === 'labels'" x-cloak>
+      <div class="bg-white border-2 border-black p-5 mb-6 flex flex-wrap items-center justify-between gap-4 no-print">
+        <div>
+          <h2 class="font-black text-lg uppercase">Minimalist Spine & QR Stickers</h2>
+          <p class="text-xs text-neutral-600">Compact 3-element layout: QR Code, Call Number, and Accession Number only.</p>
+        </div>
+        <div class="flex gap-2">
+          <button @click="renderSmallStickers()" class="border border-black bg-white px-4 py-2 font-mono text-xs font-bold uppercase">
+            ↻ Refresh QR Codes (<span x-text="copies.length"></span>)
+          </button>
+          <button @click="window.print()" class="bg-swiss-red text-white border border-black px-5 py-2 font-mono text-xs font-bold uppercase">
+            🖨️ Print Small Stickers
+          </button>
+        </div>
+      </div>
+
+      <!-- COMPACT 6-COLUMN PRINTABLE GRID -->
+      <div id="printable-stickers" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+        <template x-for="copy in copies" :key="copy.Accession_Number">
+          <div class="mini-sticker bg-white border border-black p-2 flex flex-col items-center justify-center text-center">
+            <!-- 1. Call Number -->
+            <div class="font-mono font-bold text-[10px] leading-tight text-black break-all" x-text="copy.Call_Number"></div>
+            <!-- 2. QR Code -->
+            <div class="my-1.5 flex items-center justify-center" :id="'mini-qr-' + copy.Accession_Number"></div>
+            <!-- 3. Accession Number -->
+            <div class="font-mono font-extrabold text-[11px] tracking-tight text-black" x-text="copy.Accession_Number"></div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VIEW 07: CUSTOM WHATSAPP TEMPLATES & MEMBERS MANAGER                -->
+    <!-- =================================================================== -->
+    <section x-show="activeTab === 'config'" x-cloak class="no-print grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Custom WhatsApp Template Editor -->
+      <div class="bg-white border-2 border-black p-5">
+        <h3 class="font-black text-base uppercase border-b-2 border-black pb-2 mb-3">Custom WhatsApp Message Templates</h3>
+        <p class="font-mono text-[11px] text-neutral-600 mb-3">
+          Available placeholders: <code class="bg-neutral-100 px-1">[Member_Name]</code>, <code class="bg-neutral-100 px-1">[Book_Title]</code>, <code class="bg-neutral-100 px-1">[Accession_Number]</code>, <code class="bg-neutral-100 px-1">[Issue_Date]</code>, <code class="bg-neutral-100 px-1">[Due_Date]</code>
+        </p>
+
+        <div class="space-y-3 text-xs">
+          <template x-for="tpl in whatsappTemplates" :key="tpl.Config_ID">
+            <div class="border border-black p-3 bg-neutral-50">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-mono font-bold uppercase text-swiss-red" x-text="tpl.Config_Key"></span>
+                <button @click="saveTemplate(tpl)" class="bg-black text-white font-mono text-[10px] uppercase px-2.5 py-0.5">Save Template</button>
+              </div>
+              <textarea x-model="tpl.Config_Value" rows="2" class="w-full border border-black p-2 bg-white text-xs"></textarea>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Member Directory & Adder -->
+      <div class="bg-white border-2 border-black p-5">
+        <h3 class="font-black text-base uppercase border-b-2 border-black pb-2 mb-3">Members / Borrowers (<span x-text="members.length"></span>)</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-xs">
+          <input type="text" x-model="memberForm.Full_Name" placeholder="Full Name *" class="border border-black px-2.5 py-1.5" />
+          <input type="text" x-model="memberForm.Phone_WhatsApp" placeholder="WhatsApp (9198...)" class="border border-black px-2.5 py-1.5 font-mono" />
+          <button @click="saveMember()" class="bg-black text-white font-mono font-bold uppercase py-1.5">+ Add Member</button>
+        </div>
+        <div class="divide-y divide-neutral-200 max-h-80 overflow-y-auto text-xs">
+          <template x-for="m in members" :key="m.Member_ID">
+            <div class="py-2 flex justify-between items-center">
+              <div>
+                <span class="font-bold" x-text="m.Full_Name"></span>
+                <span class="font-mono text-[11px] text-neutral-500 ml-2" x-text="m.Phone_WhatsApp"></span>
+              </div>
+              <span class="font-mono text-[11px] font-bold" x-text="'Active Loans: ' + (m.Active_Loans_Count || 0)"></span>
+            </div>
+          </template>
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- ================================================================= -->
-  <!-- MODAL 1: BOOK DETAILS, COPIES, BLURB PHOTO & BORROWING HISTORY    -->
-  <!-- ================================================================= -->
-  <div x-show="selectedBook" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-40 no-print">
-    <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl" @click.away="selectedBook = null">
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: FULL 24-FIELD BOOK DETAIL & FRONT/BACK COVER VIEWER          -->
+  <!-- ===================================================================== -->
+  <div x-show="selectedBook" x-cloak class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-40 no-print">
+    <div class="bg-white border-2 border-black max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6" @click.away="selectedBook = null">
       <template x-if="selectedBook">
         <div>
-          <div class="flex justify-between items-start gap-4">
+          <div class="flex justify-between items-start gap-4 border-b-2 border-black pb-4">
             <div>
-              <span class="bg-slate-900 text-white text-xs font-mono px-2.5 py-1 rounded" x-text="selectedBook.Call_Number"></span>
-              <h2 class="text-xl font-bold text-slate-900 mt-2" x-text="selectedBook.Title"></h2>
-              <p x-show="selectedBook.Original_Title" class="text-base text-blue-700 font-semibold" x-text="selectedBook.Original_Title"></p>
-              <p class="text-xs text-slate-500 mt-0.5" x-text="selectedBook.Authors + ' • ' + (selectedBook.Publisher || '') + ' (' + (selectedBook.Publish_Year || 'N/A') + ')'"></p>
+              <div class="flex items-center gap-2 font-mono text-xs">
+                <span class="bg-black text-white px-2 py-0.5 font-bold" x-text="selectedBook.Call_Number"></span>
+                <span class="text-neutral-500" x-text="selectedBook.Book_ID"></span>
+                <span class="border border-black px-2 py-0.5" x-text="selectedBook.Reading_Status || 'Unread'"></span>
+              </div>
+              <h2 class="font-black text-2xl mt-2 leading-tight" x-text="selectedBook.Title_English"></h2>
+              <p x-show="selectedBook.Title_Original" class="text-lg font-bold text-neutral-700 mt-0.5" x-text="selectedBook.Title_Original"></p>
             </div>
-            <div class="flex items-center gap-2">
-              <button x-show="isAdmin" @click="deleteBookRecord(selectedBook.Book_ID)" class="text-xs text-red-600 hover:underline font-semibold">🗑️ Delete</button>
-              <button @click="selectedBook = null" class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
-            </div>
+            <button @click="selectedBook = null" class="border border-black px-2.5 py-1 font-mono text-xs font-bold">✕</button>
           </div>
 
-          <!-- Cover & Blurb Photos Preview -->
-          <div class="flex flex-wrap gap-4 mt-4" x-show="selectedBook.Cover_Image_URL || selectedBook.Blurb_Image_URL">
-            <template x-if="selectedBook.Cover_Image_URL">
-              <div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Front Cover</div>
-                <a :href="selectedBook.Cover_Image_URL" target="_blank">
-                  <img :src="selectedBook.Cover_Image_URL" class="h-36 rounded border object-contain bg-slate-50" />
-                </a>
+          <!-- Front & Back Covers + Metadata Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-5">
+            <div class="space-y-2">
+              <div class="grid grid-cols-2 gap-2">
+                <div class="border border-black bg-neutral-100 h-36 flex items-center justify-center overflow-hidden">
+                  <template x-if="selectedBook.Cover_Image_URL">
+                    <img :src="selectedBook.Cover_Image_URL" class="w-full h-full object-contain" title="Front Cover" />
+                  </template>
+                  <template x-if="!selectedBook.Cover_Image_URL"><span class="font-mono text-[10px]">NO FRONT</span></template>
+                </div>
+                <div class="border border-black bg-neutral-100 h-36 flex items-center justify-center overflow-hidden">
+                  <template x-if="selectedBook.Back_Image_URL">
+                    <img :src="selectedBook.Back_Image_URL" class="w-full h-full object-contain" title="Back Cover" />
+                  </template>
+                  <template x-if="!selectedBook.Back_Image_URL"><span class="font-mono text-[10px]">NO BACK</span></template>
+                </div>
               </div>
-            </template>
-            <template x-if="selectedBook.Blurb_Image_URL">
-              <div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Back Cover / Blurb Photo</div>
-                <a :href="selectedBook.Blurb_Image_URL" target="_blank">
-                  <img :src="selectedBook.Blurb_Image_URL" class="h-36 rounded border object-contain bg-slate-50" />
-                </a>
-              </div>
-            </template>
-          </div>
-
-          <p class="text-sm text-slate-700 mt-4 whitespace-pre-line" x-text="selectedBook.Description || 'No description.'"></p>
-
-          <!-- Physical Copies Table -->
-          <div class="mt-6">
-            <div class="flex items-center justify-between mb-2">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Physical Copies & Locations</h4>
-              <button x-show="isAdmin" @click="addAnotherCopy(selectedBook)" class="text-xs bg-slate-900 text-white px-2.5 py-1 rounded font-semibold">
-                + Add Duplicate Copy
+              <button x-show="selectedBook.Has_Digital_Copy && selectedBook.Digital_View_URL"
+                      @click="activePdfUrl = selectedBook.Digital_View_URL; activePdfTitle = selectedBook.Title_English"
+                      class="w-full bg-swiss-red text-white font-mono text-xs font-bold uppercase py-2 border border-black">
+                📖 Open Digital Archive PDF
               </button>
             </div>
-            <div class="border rounded-xl overflow-hidden">
-              <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600">
-                  <tr>
-                    <th class="p-2.5">Copy ID</th>
-                    <th class="p-2.5">Spine Call No.</th>
-                    <th class="p-2.5">Location</th>
-                    <th class="p-2.5">Condition</th>
-                    <th class="p-2.5">Status / Holder</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y">
-                  <template x-for="copy in getBookCopies(selectedBook.Book_ID)" :key="copy.Copy_ID">
-                    <tr>
-                      <td class="p-2.5 font-mono font-bold" x-text="copy.Copy_ID"></td>
-                      <td class="p-2.5 font-mono" x-text="copy.Copy_Call_Number"></td>
-                      <td class="p-2.5" x-text="copy.Room + ' > ' + copy.Shelf + ' > ' + copy.Row_Position"></td>
-                      <td class="p-2.5" x-text="copy.Condition"></td>
-                      <td class="p-2.5 font-semibold" :class="copy.Status === 'Available' ? 'text-emerald-600' : 'text-amber-600'"
-                          x-text="copy.Status === 'Lent' ? 'Lent to ' + getCurrentHolderName(copy.Copy_ID) : copy.Status"></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
+
+            <div class="md:col-span-2 space-y-2 text-xs">
+              <p class="text-sm leading-relaxed text-neutral-800 whitespace-pre-line border-b border-neutral-200 pb-3"
+                 x-text="selectedBook.Description_Blurb || 'No blurb recorded.'"></p>
+              <div class="grid grid-cols-2 gap-2 font-mono text-[11px] pt-1">
+                <div><span class="text-neutral-500">AUTHOR:</span> <strong x-text="selectedBook.Authors"></strong></div>
+                <div><span class="text-neutral-500">PUBLISHER:</span> <strong x-text="selectedBook.Publisher || '—'"></strong></div>
+                <div><span class="text-neutral-500">ISBN:</span> <strong x-text="selectedBook.ISBN || '—'"></strong></div>
+                <div><span class="text-neutral-500">YEAR / ED:</span> <strong x-text="(selectedBook.Publish_Year || '—') + ' / ' + (selectedBook.Edition || '—')"></strong></div>
+                <div><span class="text-neutral-500">LANGUAGE:</span> <strong x-text="selectedBook.Language"></strong></div>
+                <div><span class="text-neutral-500">CATEGORY:</span> <strong x-text="selectedBook.Category_Genre"></strong></div>
+                <div><span class="text-neutral-500">PAGES / FMT:</span> <strong x-text="(selectedBook.Pages || '—') + 'p / ' + (selectedBook.Book_Format || 'Physical')"></strong></div>
+                <div><span class="text-neutral-500">SERIES:</span> <strong x-text="selectedBook.Series_Name ? selectedBook.Series_Name + ' #' + selectedBook.Volume_Number : 'Standalone'"></strong></div>
+              </div>
+              <div x-show="selectedBook.Notes_Remarks" class="bg-neutral-100 p-2 font-mono text-[11px]">
+                NOTES: <span x-text="selectedBook.Notes_Remarks"></span>
+              </div>
             </div>
           </div>
 
-          <!-- Book Transaction History Log -->
-          <div x-show="isAdmin" class="mt-6">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">📜 Lending & Transaction History for This Book</h4>
-            <div class="border rounded-xl overflow-hidden">
-              <table class="w-full text-left text-xs">
-                <thead class="bg-slate-100 text-slate-600">
-                  <tr>
-                    <th class="p-2">Copy</th>
-                    <th class="p-2">Borrower</th>
-                    <th class="p-2">Issued</th>
-                    <th class="p-2">Returned</th>
-                    <th class="p-2">Condition (Out → In)</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y">
-                  <template x-for="t in getBookTransactions(selectedBook.Book_ID)" :key="t.Txn_ID">
-                    <tr>
-                      <td class="p-2 font-mono" x-text="t.Copy_ID"></td>
-                      <td class="p-2 font-semibold" x-text="getMemberNameById(t.Member_ID)"></td>
-                      <td class="p-2" x-text="String(t.Issue_Date).substring(0,10)"></td>
-                      <td class="p-2" x-text="t.Return_Date ? String(t.Return_Date).substring(0,10) : 'Still Out'"></td>
-                      <td class="p-2" x-text="t.Issue_Condition + ' → ' + (t.Return_Condition || '...')"></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
+          <!-- Copies Table & Direct Actions -->
+          <div class="border-t-2 border-black pt-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-mono text-xs font-bold uppercase">Physical Copies & Shelf Locations</span>
+              <div class="flex gap-2" x-show="isAdmin">
+                <button @click="addDuplicateCopy(selectedBook)" class="border border-black px-2.5 py-1 font-mono text-[11px] font-bold uppercase">+ Add Copy</button>
+                <button @click="openEditBookForm(selectedBook); selectedBook = null" class="bg-black text-white px-3 py-1 font-mono text-[11px] font-bold uppercase">✏️ Edit Book</button>
+              </div>
             </div>
-          </div>
-        </div>
-      </template>
-    </div>
-  </div>
-
-  <!-- MODAL 2: MEMBER BORROWING HISTORY -->
-  <div x-show="selectedMember" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-40 no-print">
-    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 shadow-xl" @click.away="selectedMember = null">
-      <template x-if="selectedMember">
-        <div>
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-slate-900" x-text="selectedMember.Full_Name + ' — Borrowing History'"></h3>
-            <button @click="selectedMember = null" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
-          </div>
-          <div class="border rounded-xl overflow-hidden">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600">
+            <table class="w-full text-left text-xs border border-black">
+              <thead class="bg-neutral-100 border-b border-black font-mono text-[10px] uppercase">
                 <tr>
-                  <th class="p-2.5">Book Title</th>
-                  <th class="p-2.5">Copy ID</th>
-                  <th class="p-2.5">Issued</th>
-                  <th class="p-2.5">Due</th>
-                  <th class="p-2.5">Returned</th>
+                  <th class="p-2">Accession</th>
+                  <th class="p-2">Call No</th>
+                  <th class="p-2">Shelf Location</th>
+                  <th class="p-2">Condition</th>
+                  <th class="p-2">Status</th>
                 </tr>
               </thead>
-              <tbody class="divide-y">
-                <template x-for="t in getMemberTransactions(selectedMember.Member_ID)" :key="t.Txn_ID">
+              <tbody class="divide-y divide-neutral-200 font-mono">
+                <template x-for="c in getBookCopies(selectedBook.Book_ID)" :key="c.Accession_Number">
                   <tr>
-                    <td class="p-2.5 font-bold" x-text="getBookTitleById(t.Book_ID)"></td>
-                    <td class="p-2.5 font-mono" x-text="t.Copy_ID"></td>
-                    <td class="p-2.5" x-text="String(t.Issue_Date).substring(0,10)"></td>
-                    <td class="p-2.5" x-text="String(t.Due_Date).substring(0,10)"></td>
-                    <td class="p-2.5 font-semibold" :class="t.Return_Date ? 'text-emerald-600' : 'text-amber-600'"
-                        x-text="t.Return_Date ? String(t.Return_Date).substring(0,10) : 'Currently Reading'"></td>
+                    <td class="p-2 font-bold" x-text="c.Accession_Number"></td>
+                    <td class="p-2" x-text="c.Call_Number"></td>
+                    <td class="p-2" x-text="c.Shelf_Location"></td>
+                    <td class="p-2" x-text="c.Book_Condition"></td>
+                    <td class="p-2 font-bold" x-text="c.Status"></td>
                   </tr>
                 </template>
               </tbody>
@@ -900,48 +1015,120 @@
     </div>
   </div>
 
-  <!-- MODAL 3: EMBEDDED PDF READER -->
-  <div x-show="activePdfItem" x-cloak class="fixed inset-0 bg-slate-900/80 flex flex-col z-50 p-2 sm:p-6 no-print">
-    <div class="bg-slate-900 text-white px-4 py-2.5 rounded-t-xl flex items-center justify-between">
-      <div class="text-sm font-bold" x-text="activePdfItem ? getBookTitleById(activePdfItem.Book_ID) : ''"></div>
-      <button @click="activePdfItem = null" class="bg-red-600 hover:bg-red-500 text-xs font-bold px-3 py-1 rounded">Close Reader ✕</button>
-    </div>
-    <div class="flex-1 bg-slate-800 rounded-b-xl overflow-hidden">
-      <template x-if="activePdfItem">
-        <iframe :src="activePdfItem.Drive_View_URL" class="w-full h-full border-0" allow="autoplay"></iframe>
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: DIRECT CATALOG QUICK-CHECKOUT MODAL                          -->
+  <!-- ===================================================================== -->
+  <div x-show="quickCheckoutBook" x-cloak class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 no-print">
+    <div class="bg-white border-2 border-black max-w-md w-full p-6" @click.away="quickCheckoutBook = null">
+      <template x-if="quickCheckoutBook">
+        <div>
+          <h3 class="font-black text-lg uppercase border-b-2 border-black pb-2 mb-3">Quick Checkout</h3>
+          <p class="text-sm font-bold mb-4" x-text="quickCheckoutBook.Title_English"></p>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Copy Accession Number</label>
+              <select x-model="checkoutForm.Accession_Number" class="w-full border border-black px-3 py-2 font-mono bg-white">
+                <template x-for="c in getAvailableCopies(quickCheckoutBook.Book_ID)" :key="c.Accession_Number">
+                  <option :value="c.Accession_Number" x-text="c.Accession_Number + ' (' + c.Shelf_Location + ')'"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Select Borrower (Member) *</label>
+              <select x-model="checkoutForm.Member_ID" class="w-full border border-black px-3 py-2 bg-white">
+                <option value="">-- Choose Member --</option>
+                <template x-for="m in members" :key="m.Member_ID">
+                  <option :value="m.Member_ID" x-text="m.Full_Name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Loan Days</label>
+              <input type="number" x-model="checkoutForm.Loan_Days" class="w-full border border-black px-3 py-1.5" />
+            </div>
+          </div>
+
+          <div class="mt-5 flex justify-end gap-2">
+            <button @click="quickCheckoutBook = null" class="border border-black px-4 py-2 font-mono text-xs font-bold uppercase">Cancel</button>
+            <button @click="submitCheckout(); quickCheckoutBook = null" class="bg-swiss-red text-white border border-black px-5 py-2 font-mono text-xs font-bold uppercase">
+              Confirm & Issue
+            </button>
+          </div>
+        </div>
       </template>
     </div>
   </div>
 
-  <!-- MODAL 4: SETTINGS & LOGIN -->
-  <div x-show="showSettingsModal" x-cloak class="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50 no-print">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-      <h3 class="text-lg font-bold text-slate-900 mb-1">⚙️ Connection & Librarian Login</h3>
-      <p class="text-xs text-slate-500 mb-4">Connect your Google Apps Script Web App URL and enter your PIN to unlock Librarian tools.</p>
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Apps Script Web App URL (`/exec`)</label>
-          <input type="url" x-model="apiUrl" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border rounded-lg px-3 py-2 text-xs" />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Librarian Admin PIN (Leave blank for Public Catalog)</label>
-          <input type="password" x-model="adminPin" placeholder="Enter your ADMIN_PIN" class="w-full border rounded-lg px-3 py-2 text-xs" />
-        </div>
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: DEWEY DECIMAL CLASSIFICATION (DDC) INTERACTIVE GUIDE CHART   -->
+  <!-- ===================================================================== -->
+  <div x-show="showDdcModal" x-cloak class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 no-print">
+    <div class="bg-white border-2 border-black max-w-xl w-full max-h-[85vh] overflow-y-auto p-6" @click.away="showDdcModal = false">
+      <div class="flex justify-between items-center border-b-2 border-black pb-3 mb-4">
+        <h3 class="font-black text-base uppercase">Dewey Decimal (DDC) Quick Classification Guide</h3>
+        <button @click="showDdcModal = false" class="border border-black px-2 py-0.5 font-mono text-xs font-bold">✕</button>
       </div>
-      <div class="mt-5 flex justify-end gap-2">
-        <button @click="showSettingsModal = false" class="px-4 py-2 border rounded-lg text-xs font-semibold">Close</button>
-        <button @click="saveSettings()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold">Save & Connect</button>
+      <p class="text-xs text-neutral-600 mb-3">Click any row below to insert that DDC classification code + Author suffix into your Call Number box:</p>
+      <div class="divide-y divide-neutral-200 border border-black font-mono text-xs">
+        <template x-for="item in ddcGuideList" :key="item.code">
+          <button type="button" @click="applyDdcFromGuide(item.code)"
+                  class="w-full p-2.5 text-left flex justify-between items-center hover:bg-black hover:text-white transition">
+            <span><strong x-text="item.code"></strong> — <span class="font-sans" x-text="item.label"></span></span>
+            <span class="text-[10px] uppercase">Use →</span>
+          </button>
+        </template>
       </div>
     </div>
   </div>
 
-  <!-- APPLICATION LOGIC -->
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: EMBEDDED PDF ARCHIVE READER                                  -->
+  <!-- ===================================================================== -->
+  <div x-show="activePdfUrl" x-cloak class="fixed inset-0 bg-black/90 flex flex-col z-50 p-2 sm:p-6 no-print">
+    <div class="bg-black text-white px-4 py-2.5 flex items-center justify-between border border-neutral-700">
+      <span class="font-mono text-xs font-bold uppercase" x-text="activePdfTitle"></span>
+      <button @click="activePdfUrl = ''" class="bg-swiss-red text-white font-mono text-xs font-bold uppercase px-3 py-1">Close PDF ✕</button>
+    </div>
+    <div class="flex-1 bg-neutral-900">
+      <template x-if="activePdfUrl">
+        <iframe :src="activePdfUrl" class="w-full h-full border-0" allow="autoplay"></iframe>
+      </template>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 5: API CONNECTION & LIBRARIAN PIN LOGIN                         -->
+  <!-- ===================================================================== -->
+  <div x-show="showLoginModal" x-cloak class="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50 no-print">
+    <div class="bg-white border-2 border-black max-w-md w-full p-6">
+      <h3 class="font-black text-lg uppercase border-b-2 border-black pb-2 mb-4">System Connection & Staff Login</h3>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Apps Script Web App URL (`/exec`)</label>
+          <input type="url" x-model="apiUrl" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border border-black px-3 py-2 font-mono" />
+        </div>
+        <div>
+          <label class="block font-mono uppercase text-[10px] text-neutral-500 mb-1">Librarian PIN (Leave empty for Public Catalog)</label>
+          <input type="password" x-model="adminPin" placeholder="••••" class="w-full border border-black px-3 py-2 font-mono" />
+        </div>
+      </div>
+      <div class="mt-5 flex justify-end gap-2">
+        <button @click="showLoginModal = false" class="border border-black px-4 py-2 font-mono text-xs font-bold uppercase">Close</button>
+        <button @click="saveConnection()" class="bg-swiss-red text-white border border-black px-5 py-2 font-mono text-xs font-bold uppercase">Save & Sync</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION LOGIC                                                     -->
+  <!-- ===================================================================== -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    function lmsApp() {
+    function swissLibraryApp() {
       return {
         apiUrl: localStorage.getItem('LMS_API_URL') || '',
         adminPin: sessionStorage.getItem('LMS_ADMIN_PIN') || '',
@@ -949,40 +1136,64 @@
 
         activeTab: 'catalog',
         loading: false,
-        loadingMessage: 'Loading...',
-        showSettingsModal: false,
+        loadingText: 'SYNCING...',
+        showLoginModal: false,
+        showDdcModal: false,
         installPromptEvent: null,
 
         catalog: [],
         copies: [],
+        configs: [],
+        knownAuthors: [],
+        knownPublishers: [],
         digitalArchive: [],
         members: [],
         transactions: [],
-        whatsappQueue: [],
-        waLang: 'en',
 
+        // Search & Categorization Filters
         searchQuery: '',
         filterLanguage: '',
-        filterGenre: '',
-        filterStatus: '',
+        filterCategory: '',
+        activeAuthorFilter: '',
+        activePublisherFilter: '',
 
+        // Modals & Active Selections
         selectedBook: null,
-        selectedMember: null,
-        activePdfItem: null,
+        quickCheckoutBook: null,
+        activePdfUrl: '',
+        activePdfTitle: '',
+        selectedWaTemplateKey: 'Book_Taken_Update',
 
-        checkoutForm: { Copy_ID: '', Member_ID: '', Loan_Days: 14, Notes: '' },
-        checkinForm: { Copy_ID: '', Return_Condition: 'Good', Notes: '' },
-        memberForm: { Full_Name: '', Relationship: 'Friend', Phone_WhatsApp: '', Email: '', Max_Loan_Limit: 3 },
-
-        // Add Book State (Multi-Server ISBN + Cover/Blurb Upload + Google Lens)
-        scannerActive: false,
+        // Scanners
+        qrInstance: null,
+        homeScannerActive: false,
+        formScannerActive: false,
         deskScannerMode: '',
-        html5QrCode: null,
-        isbnLookupInput: '',
-        lookupSources: [],
-        coverLensUrl: '',
-        blurbLensUrl: '',
+
+        // Forms
         formBook: {},
+        checkoutForm: { Accession_Number: '', Member_ID: '', Loan_Days: 14, Notes: '' },
+        checkinForm: { Accession_Number: '', Return_Condition: 'Good', Notes: '' },
+        memberForm: { Full_Name: '', Phone_WhatsApp: '', Relationship: 'Friend' },
+
+        ddcGuideList: [
+          { code: '000', label: 'Computer Science, Information & General Works' },
+          { code: '100', label: 'Philosophy & Psychology' },
+          { code: '200', label: 'Religion & Theology' },
+          { code: '297', label: 'Islamic Studies, Quran & Hadith' },
+          { code: '300', label: 'Social Sciences & Sociology' },
+          { code: '400', label: 'Language, Grammar & Dictionaries' },
+          { code: '500', label: 'Natural Sciences & Mathematics' },
+          { code: '600', label: 'Technology, Medicine & Applied Sciences' },
+          { code: '700', label: 'Arts, Architecture & Photography' },
+          { code: '800', label: 'World Literature, Fiction & Poetry' },
+          { code: '823', label: 'English Fiction' },
+          { code: '892.7', label: 'Arabic Literature' },
+          { code: '894.812', label: 'Malayalam Literature (മലയാള സാഹിത്യം)' },
+          { code: '900', label: 'History, Geography & Biography' },
+          { code: '920', label: 'Biography, Autobiography & Memoirs' },
+          { code: '954', label: 'History of India & Kerala' }
+        ],
 
         initApp() {
           this.resetFormBook();
@@ -990,15 +1201,14 @@
             e.preventDefault();
             this.installPromptEvent = e;
           });
-          if (!this.apiUrl) this.showSettingsModal = true;
+          if (!this.apiUrl) this.showLoginModal = true;
           else this.loadSnapshot();
         },
 
         switchTab(tab) {
-          this.stopScanner();
+          this.stopAllScanners();
           this.activeTab = tab;
-          if (tab === 'whatsapp' && this.isAdmin) this.loadWhatsAppQueue();
-          if (tab === 'labels') this.$nextTick(() => this.renderAllStickers());
+          if (tab === 'labels') this.$nextTick(() => this.renderSmallStickers());
         },
 
         async installPWA() {
@@ -1008,337 +1218,364 @@
           this.installPromptEvent = null;
         },
 
-        saveSettings() {
+        saveConnection() {
           localStorage.setItem('LMS_API_URL', this.apiUrl.trim());
           sessionStorage.setItem('LMS_ADMIN_PIN', this.adminPin.trim());
-          this.showSettingsModal = false;
+          this.showLoginModal = false;
           this.loadSnapshot();
         },
 
         async loadSnapshot() {
           if (!this.apiUrl) return;
           this.loading = true;
-          this.loadingMessage = 'Syncing live data with Google Sheets...';
+          this.loadingText = 'FETCHING LIVE CATALOG...';
           try {
             const role = this.isAdmin ? 'Admin' : 'Guest';
             const res = await fetch(`${this.apiUrl}?action=getInitialSnapshot&role=${role}`);
-            const data = await res.json();
-            if (data.status === 'ok') {
-              this.catalog = data.catalog || [];
-              this.copies = data.copies || [];
-              this.digitalArchive = data.digitalArchive || [];
-              this.members = data.members || [];
-              this.transactions = data.transactions || [];
-              if (this.isAdmin) this.loadWhatsAppQueue();
+            const out = await res.json();
+            if (out.status === 'ok') {
+              this.catalog = out.catalog || [];
+              this.copies = out.copies || [];
+              this.configs = out.configs || [];
+              this.knownAuthors = out.knownAuthors || [];
+              this.knownPublishers = out.knownPublishers || [];
+              this.digitalArchive = out.digitalArchive || [];
+              this.members = out.members || [];
+              this.transactions = out.transactions || [];
             }
-          } catch (err) {
-            alert('Failed to connect to Apps Script URL. Check Settings.');
+          } catch (e) {
+            alert('Connection error. Please verify your Apps Script Web App URL.');
           } finally {
             this.loading = false;
           }
         },
 
-        get uniqueLanguages() { return [...new Set(this.catalog.map(b => b.Language).filter(Boolean))]; },
-        get uniqueGenres() {
-          const all = [];
-          this.catalog.forEach(b => String(b.Genres || '').split(',').forEach(g => { if (g.trim()) all.push(g.trim()); }));
-          return [...new Set(all)];
+        // Dynamic Dropdowns Helper
+        configList(type) {
+          const items = this.configs.filter(c => c.Config_Type === type).map(c => c.Config_Value);
+          return items.length ? items : ['General'];
         },
-        get availableCopiesList() { return this.copies.filter(c => c.Status === 'Available'); },
-        get activeTransactions() { return this.transactions.filter(t => t.Status === 'Active' || t.Status === 'Overdue'); },
 
+        get whatsappTemplates() {
+          return this.configs.filter(c => c.Config_Type === 'WhatsApp_Template');
+        },
+
+        get availableCopiesList() {
+          return this.copies.filter(c => c.Status === 'Available');
+        },
+
+        get activeLoans() {
+          return this.transactions.filter(t => t.Status === 'Active' || t.Status === 'Overdue');
+        },
+
+        // Filtering & Clickable Author/Publisher Categorization
         get filteredCatalog() {
           const q = this.searchQuery.toLowerCase().trim();
           return this.catalog.filter(b => {
-            const copyLocs = this.getBookCopies(b.Book_ID).map(c => `${c.Copy_ID} ${c.Room} ${c.Shelf}`).join(' ').toLowerCase();
-            const matchesQuery = !q ||
-              String(b.Title || '').toLowerCase().includes(q) ||
-              String(b.Original_Title || '').toLowerCase().includes(q) ||
+            const copyIds = this.getBookCopies(b.Book_ID).map(c => c.Accession_Number).join(' ').toLowerCase();
+            const matchQ = !q ||
+              String(b.Title_English || '').toLowerCase().includes(q) ||
+              String(b.Title_Original || '').toLowerCase().includes(q) ||
               String(b.Authors || '').toLowerCase().includes(q) ||
-              String(b.ISBN_13 || '').toLowerCase().includes(q) ||
+              String(b.Publisher || '').toLowerCase().includes(q) ||
+              String(b.ISBN || '').toLowerCase().includes(q) ||
               String(b.Call_Number || '').toLowerCase().includes(q) ||
-              copyLocs.includes(q);
-            const matchesLang = !this.filterLanguage || b.Language === this.filterLanguage;
-            const matchesGenre = !this.filterGenre || String(b.Genres || '').includes(this.filterGenre);
-            let matchesStatus = true;
-            if (this.filterStatus === 'Available') matchesStatus = this.getAvailableCopyCount(b.Book_ID) > 0;
-            else if (this.filterStatus === 'Lent') matchesStatus = this.getAvailableCopyCount(b.Book_ID) === 0 && this.getBookCopies(b.Book_ID).length > 0;
-            else if (this.filterStatus === 'Digital') matchesStatus = Boolean(b.Has_Digital_Copy);
-            return matchesQuery && matchesLang && matchesGenre && matchesStatus;
+              copyIds.includes(q);
+
+            const matchLang = !this.filterLanguage || b.Language === this.filterLanguage;
+            const matchCat = !this.filterCategory || b.Category_Genre === this.filterCategory;
+            const matchAut = !this.activeAuthorFilter || String(b.Authors || '').toLowerCase().includes(this.activeAuthorFilter.toLowerCase());
+            const matchPub = !this.activePublisherFilter || String(b.Publisher || '').toLowerCase() === this.activePublisherFilter.toLowerCase();
+
+            return matchQ && matchLang && matchCat && matchAut && matchPub;
           });
+        },
+
+        filterByAuthor(authorStr) {
+          this.activeAuthorFilter = String(authorStr || '').split(',')[0].trim();
+          this.activePublisherFilter = '';
+          this.switchTab('catalog');
+        },
+
+        filterByPublisher(pubStr) {
+          this.activePublisherFilter = String(pubStr || '').trim();
+          this.activeAuthorFilter = '';
+          this.switchTab('catalog');
+        },
+
+        resetAllFilters() {
+          this.searchQuery = '';
+          this.filterLanguage = '';
+          this.filterCategory = '';
+          this.activeAuthorFilter = '';
+          this.activePublisherFilter = '';
+        },
+
+        countBooksByAuthor(aut) {
+          return this.catalog.filter(b => String(b.Authors || '').toLowerCase().includes(aut.toLowerCase())).length;
+        },
+
+        countBooksByPublisher(pub) {
+          return this.catalog.filter(b => String(b.Publisher || '').toLowerCase() === pub.toLowerCase()).length;
         },
 
         getBookCopies(bookId) { return this.copies.filter(c => c.Book_ID === bookId); },
-        getAvailableCopyCount(bookId) { return this.copies.filter(c => c.Book_ID === bookId && c.Status === 'Available').length; },
-        getBookTitleById(bookId) { const b = this.catalog.find(x => x.Book_ID === bookId); return b ? b.Title : bookId; },
-        getMemberNameById(memId) { const m = this.members.find(x => x.Member_ID === memId); return m ? m.Full_Name : memId; },
-        getCurrentHolderName(copyId) {
-          const t = this.activeTransactions.find(x => x.Copy_ID === copyId);
-          return t ? this.getMemberNameById(t.Member_ID) : 'Unknown';
-        },
-        getBookTransactions(bookId) { return this.transactions.filter(t => t.Book_ID === bookId).reverse(); },
-        getMemberTransactions(memId) { return this.transactions.filter(t => t.Member_ID === memId).reverse(); },
-
-        isOverdue(dueDateStr) {
-          if (!dueDateStr) return false;
-          return String(dueDateStr).substring(0, 10) < new Date().toISOString().substring(0, 10);
+        getAvailableCopies(bookId) { return this.copies.filter(c => c.Book_ID === bookId && c.Status === 'Available'); },
+        getBookTitle(bookId) { const b = this.catalog.find(x => x.Book_ID === bookId); return b ? b.Title_English : bookId; },
+        getPrimaryCopyLocation(bookId) {
+          const c = this.copies.find(x => x.Book_ID === bookId);
+          return c ? c.Shelf_Location : 'Unassigned';
         },
 
-        openBookDetailModal(book) { this.selectedBook = book; },
-        openMemberHistoryModal(member) { this.selectedMember = member; },
-        openPdfViewer(item) { this.activePdfItem = item; },
-
-        // =================================================================
-        // 1. MULTI-SERVER ISBN BARCODE SCAN & LOOKUP
-        // =================================================================
-        toggleBarcodeScanner() {
-          if (this.scannerActive) { this.stopScanner(); return; }
-          this.stopScanner();
-          this.scannerActive = true;
+        // ===================================================================
+        // HOME PAGE QR SCANNER (GET BOOK DETAILS BY SCANNING PHYSICAL BOOK)
+        // ===================================================================
+        toggleHomeQrScanner() {
+          if (this.homeScannerActive) { this.stopAllScanners(); return; }
+          this.stopAllScanners();
+          this.homeScannerActive = true;
           this.$nextTick(() => {
-            this.html5QrCode = new Html5Qrcode("barcode-reader");
-            this.html5QrCode.start(
+            this.qrInstance = new Html5Qrcode("home-qr-reader");
+            this.qrInstance.start(
               { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 250, height: 120 } },
+              { fps: 10, qrbox: { width: 240, height: 160 } },
               (decodedText) => {
-                this.isbnLookupInput = decodedText.trim();
-                this.stopScanner();
-                this.fetchIsbnMetadata();
+                const code = decodedText.trim();
+                this.stopAllScanners();
+                // 1. Match by Copy Accession_Number (QR Sticker)
+                const copyMatch = this.copies.find(c => String(c.Accession_Number).toUpperCase() === code.toUpperCase());
+                if (copyMatch) {
+                  const parentBook = this.catalog.find(b => b.Book_ID === copyMatch.Book_ID);
+                  if (parentBook) { this.openBookDetail(parentBook); return; }
+                }
+                // 2. Or match by ISBN Barcode
+                const isbnMatch = this.catalog.find(b => String(b.ISBN).replace(/[^0-9X]/gi, '') === code.replace(/[^0-9X]/gi, ''));
+                if (isbnMatch) {
+                  this.openBookDetail(isbnMatch);
+                } else {
+                  alert(`No catalog record found for scanned code "${code}".`);
+                }
               },
               () => {}
-            ).catch(err => { alert('Camera error: ' + err); this.scannerActive = false; });
+            ).catch(err => { alert('Camera error: ' + err); this.homeScannerActive = false; });
           });
         },
 
-        stopScanner() {
-          if (this.html5QrCode) {
-            this.html5QrCode.stop().then(() => {
-              this.html5QrCode.clear();
-              this.scannerActive = false;
-              this.deskScannerMode = '';
-            }).catch(() => { this.scannerActive = false; this.deskScannerMode = ''; });
-          } else {
-            this.scannerActive = false;
-            this.deskScannerMode = '';
-          }
+        // ===================================================================
+        // 24-FIELD ADD / EDIT BOOK & RE-SCAN ISBN
+        // ===================================================================
+        openNewBookForm() {
+          this.resetFormBook();
+          this.switchTab('form');
         },
 
-        async fetchIsbnMetadata() {
-          const q = this.isbnLookupInput.trim();
-          if (!q) {
-            alert('Please scan a barcode or type an ISBN / Title first.');
-            return;
-          }
-          this.loading = true;
-          this.loadingMessage = 'Searching Google Books, Open Library, Works & Internet Archive...';
-          this.lookupSources = [];
-          try {
-            const isNumericIsbn = /^[0-9Xx\- ]{9,17}$/.test(q);
-            const res = await fetch(this.apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({
-                action: 'lookupIsbn',
-                pin: this.adminPin,
-                data: {
-                  isbn: isNumericIsbn ? q : '',
-                  title: isNumericIsbn ? '' : q
-                }
-              })
-            });
-            const out = await res.json();
-            if (out.status === 'ok' && out.found) {
-              // Preserve any already-uploaded Drive cover or blurb photos if present
-              const existingCover = this.formBook.Cover_Image_URL;
-              const existingBlurbImg = this.formBook.Blurb_Image_URL;
-              this.formBook = {
-                ...this.formBook,
-                ...out.book,
-                Cover_Image_URL: existingCover || out.book.Cover_Image_URL || '',
-                Blurb_Image_URL: existingBlurbImg || ''
-              };
-              this.lookupSources = out.sources || ['Public ISBN Server'];
-            } else {
-              if (isNumericIsbn) this.formBook.ISBN_13 = q.replace(/[^0-9X]/gi, '');
-              alert('No match found on public ISBN servers. You can upload the Cover & Blurb photos below and use Google Lens to paste the text.');
-            }
-          } catch (e) {
-            alert('Lookup failed: ' + e.message);
-          } finally {
-            this.loading = false;
-          }
+        openEditBookForm(book) {
+          const primaryCopy = this.copies.find(c => c.Book_ID === book.Book_ID) || {};
+          this.formBook = {
+            ...book,
+            isEditMode: true,
+            Accession_Number: primaryCopy.Accession_Number || '',
+            Shelf_Location: primaryCopy.Shelf_Location || this.configList('Shelf_Location')[0],
+            Date_Acquired: primaryCopy.Date_Acquired ? String(primaryCopy.Date_Acquired).substring(0, 10) : '',
+            Purchase_Price: primaryCopy.Purchase_Price || '',
+            Book_Condition: primaryCopy.Book_Condition || 'Good',
+            frontCoverBase64: '',
+            backCoverBase64: '',
+            pdfBase64: '',
+            pdfFileName: ''
+          };
+          this.switchTab('form');
         },
 
-        // =================================================================
-        // 2. COMPRESS & UPLOAD COVER / BLURB PHOTO TO DRIVE + GOOGLE LENS
-        // =================================================================
-        handleSingleImageUpload(event, type) {
+        rescanIsbn() {
+          this.formBook.ISBN = '';
+          if (this.formScannerActive) { this.stopAllScanners(); return; }
+          this.stopAllScanners();
+          this.formScannerActive = true;
+          this.$nextTick(() => {
+            this.qrInstance = new Html5Qrcode("form-isbn-reader");
+            this.qrInstance.start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 240, height: 120 } },
+              (decoded) => {
+                this.formBook.ISBN = decoded.trim();
+                this.stopAllScanners();
+                this.runAiPipeline();
+              },
+              () => {}
+            ).catch(() => { this.formScannerActive = false; });
+          });
+        },
+
+        handleCoverUpload(event, side) {
           const file = event.target.files[0];
           if (!file) return;
-
           const reader = new FileReader();
           reader.onload = (e) => {
             const img = new Image();
-            img.onload = async () => {
+            img.onload = () => {
               const canvas = document.createElement('canvas');
-              const maxDim = type === 'blurb' ? 1400 : 1000;
-              let w = img.width, h = img.height;
+              let w = img.width, h = img.height, maxDim = 1200;
               if (w > h && w > maxDim) { h *= maxDim / w; w = maxDim; }
               else if (h > maxDim) { w *= maxDim / h; h = maxDim; }
-              canvas.width = w;
-              canvas.height = h;
+              canvas.width = w; canvas.height = h;
               canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-
-              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.82);
-
-              this.loading = true;
-              this.loadingMessage = `Compressing & uploading ${type === 'cover' ? 'Cover' : 'Blurb'} photo to Google Drive...`;
-              try {
-                const hint = (this.formBook.Title || this.isbnLookupInput || 'Book') + '_' + type;
-                const res = await fetch(this.apiUrl, {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    action: 'uploadBookImage',
-                    pin: this.adminPin,
-                    data: {
-                      base64: compressedBase64,
-                      mimeType: 'image/jpeg',
-                      fileName: hint
-                    }
-                  })
-                });
-                const out = await res.json();
-                if (out.status === 'ok') {
-                  if (type === 'cover') {
-                    this.formBook.Cover_Image_URL = out.thumbnailUrl;
-                    this.coverLensUrl = out.googleLensUrl;
-                  } else {
-                    this.formBook.Blurb_Image_URL = out.thumbnailUrl;
-                    this.blurbLensUrl = out.googleLensUrl;
-                  }
-                } else {
-                  alert('Drive upload error: ' + out.message);
-                }
-              } catch (err) {
-                alert('Upload failed: ' + err.message);
-              } finally {
-                this.loading = false;
-              }
+              const compressed = canvas.toDataURL('image/jpeg', 0.82);
+              if (side === 'front') this.formBook.frontCoverBase64 = compressed;
+              else this.formBook.backCoverBase64 = compressed;
             };
             img.src = e.target.result;
           };
           reader.readAsDataURL(file);
         },
 
-        async pasteIntoField(fieldName) {
-          try {
-            const text = await navigator.clipboard.readText();
-            if (text) {
-              this.formBook[fieldName] = this.formBook[fieldName]
-                ? (this.formBook[fieldName] + '\n' + text.trim())
-                : text.trim();
-              if (fieldName === 'Authors') this.updateAutoCallPreview();
-            } else {
-              alert('Clipboard is empty. Copy text from Google Lens first, then tap Paste.');
-            }
-          } catch (e) {
-            alert('Please tap inside the box and long-press -> Paste (or press Ctrl+V).');
+        handleFormPdfSelect(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          this.formBook.pdfFileName = file.name;
+          const reader = new FileReader();
+          reader.onload = (e) => { this.formBook.pdfBase64 = e.target.result; };
+          reader.readAsDataURL(file);
+        },
+
+        async runAiPipeline() {
+          const imgs = [];
+          if (this.formBook.frontCoverBase64) imgs.push({ base64: this.formBook.frontCoverBase64, mimeType: 'image/jpeg' });
+          if (this.formBook.backCoverBase64) imgs.push({ base64: this.formBook.backCoverBase64, mimeType: 'image/jpeg' });
+
+          if (!this.formBook.ISBN && imgs.length === 0) {
+            alert('Please scan/enter an ISBN or snap a Front/Back cover photo first.');
+            return;
           }
-        },
-
-        // =================================================================
-        // 3. CALL NUMBER & SAVE BOOK
-        // =================================================================
-        setCallNumberMode(mode) {
-          this.formBook.Call_Number_Mode = mode;
-          if (mode === 'Auto') this.updateAutoCallPreview();
-          else if (mode === 'DDC') this.formBook.Call_Number = this.formBook.Suggested_DDC || '000 GEN';
-        },
-
-        updateAutoCallPreview() {
-          if (this.formBook.Call_Number_Mode !== 'Auto') return;
-          const lang = (this.formBook.Language || 'ENG').substring(0, 3).toUpperCase();
-          const genre = (this.formBook.Genres || 'GEN').split(',')[0].trim().substring(0, 3).toUpperCase();
-          const authorParts = (this.formBook.Authors || 'AUT').split(',')[0].trim().split(/\s+/);
-          const authorCode = (authorParts[authorParts.length - 1] || 'AUT').substring(0, 3).toUpperCase();
-          const yr = this.formBook.Publish_Year || 'ND';
-          this.formBook.Call_Number = `${lang}-${genre}-${authorCode}-${yr}`;
-        },
-
-        resetFormBook() {
-          this.isbnLookupInput = '';
-          this.lookupSources = [];
-          this.coverLensUrl = '';
-          this.blurbLensUrl = '';
-          this.formBook = {
-            Title: '', Original_Title: '', Subtitle: '', Authors: '',
-            ISBN_13: '', ISBN_10: '', Publisher: '', Publish_Year: '',
-            Language: 'English', Genres: 'General', Pages: '',
-            Description: '', Call_Number: 'ENG-GEN-AUT-ND', Call_Number_Mode: 'Auto',
-            Suggested_DDC: '', Room: 'Main Room', Shelf: 'Shelf A', Row_Position: 'Row 1',
-            Condition: 'Good', Purchase_Price: '',
-            Cover_Image_URL: '', Blurb_Image_URL: '', Digital_Drive_URL: ''
-          };
-        },
-
-        async saveBookToDatabase() {
-          if (!this.formBook.Title) { alert('Book Title is required.'); return; }
           this.loading = true;
-          this.loadingMessage = 'Saving book & physical copy to Google Sheets...';
+          this.loadingText = 'ANALYZING BOOK VIA AI OCR & PUBLIC APIS...';
           try {
             const res = await fetch(this.apiUrl, {
               method: 'POST',
-              body: JSON.stringify({ action: 'addOrUpdateBook', pin: this.adminPin, data: this.formBook })
+              body: JSON.stringify({
+                action: 'analyzeBookPipeline',
+                pin: this.adminPin,
+                data: { isbn: this.formBook.ISBN, images: imgs, forceAiOcr: imgs.length > 0 }
+              })
             });
             const out = await res.json();
-            if (out.status === 'duplicate_detected') {
-              if (confirm(`Duplicate detected: "${out.existingBook.Title}" is already in your catalog. Add a second physical copy instead?`)) {
-                await this.addAnotherCopy(out.existingBook);
-              }
-            } else if (out.status === 'ok') {
-              if (this.formBook.Digital_Drive_URL) {
-                await fetch(this.apiUrl, {
-                  method: 'POST',
-                  body: JSON.stringify({ action: 'linkDigitalCopy', pin: this.adminPin, data: { Book_ID: out.book.Book_ID, Drive_URL: this.formBook.Digital_Drive_URL } })
-                });
-              }
-              alert(`Saved! Assigned Copy ID: ${out.copy ? out.copy.Copy_ID : 'N/A'}`);
-              this.resetFormBook();
-              await this.loadSnapshot();
-              this.activeTab = 'catalog';
-            } else {
-              alert('Error: ' + out.message);
-            }
-          } finally {
-            this.loading = false;
-          }
+            if (out.status === 'ok') {
+              this.formBook = { ...this.formBook, ...out.book };
+            } else alert(out.message);
+          } finally { this.loading = false; }
         },
 
-        // =================================================================
-        // 4. LENDING, RETURN, MEMBERS, WHATSAPP & LABELS
-        // =================================================================
+        setCallMode(mode) {
+          this.formBook.Call_Number_Mode = mode;
+          if (mode === 'Auto') this.refreshAutoCallNo();
+          else if (mode === 'DDC') this.formBook.Call_Number = this.formBook.Suggested_DDC || '800 LIT';
+        },
+
+        applyDdcFromGuide(code) {
+          const aut = String(this.formBook.Authors || 'AUT').split(',')[0].trim().split(/\s+/).pop().substring(0, 3).toUpperCase();
+          this.formBook.Call_Number_Mode = 'Manual';
+          this.formBook.Call_Number = `${code} ${aut}`;
+          this.showDdcModal = false;
+        },
+
+        refreshAutoCallNo() {
+          if (this.formBook.Call_Number_Mode !== 'Auto') return;
+          const lang = String(this.formBook.Language || 'ENG').substring(0, 3).toUpperCase();
+          const cat = String(this.formBook.Category_Genre || 'GEN').substring(0, 3).toUpperCase();
+          const aut = String(this.formBook.Authors || 'AUT').split(',')[0].trim().split(/\s+/).pop().substring(0, 3).toUpperCase();
+          const yr = this.formBook.Publish_Year || 'ND';
+          this.formBook.Call_Number = `${lang}-${cat}-${aut}-${yr}`;
+        },
+
+        async promptNewConfig(type) {
+          const val = prompt(`Enter new option for ${type}:`);
+          if (!val) return;
+          this.loading = true;
+          try {
+            await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'saveSystemConfig', pin: this.adminPin, data: { Config_Type: type, Config_Key: val, Config_Value: val } })
+            });
+            await this.loadSnapshot();
+            if (type === 'Language') this.formBook.Language = val;
+            if (type === 'Category_Genre') this.formBook.Category_Genre = val;
+            if (type === 'Shelf_Location') this.formBook.Shelf_Location = val;
+          } finally { this.loading = false; }
+        },
+
+        async saveBookRecord() {
+          if (!this.formBook.Title_English) { alert('English / Transliterated Book Title is required.'); return; }
+          this.loading = true;
+          this.loadingText = 'SAVING 24-FIELD RECORD TO GOOGLE SHEETS...';
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'saveBookAndCopy', pin: this.adminPin, data: this.formBook })
+            });
+            const out = await res.json();
+            if (out.status === 'ok') {
+              alert(`Saved "${out.book.Title_English}"! Accession: ${out.copy ? out.copy.Accession_Number : 'Updated'}`);
+              this.resetFormBook();
+              await this.loadSnapshot();
+              this.switchTab('catalog');
+            } else alert(out.message);
+          } finally { this.loading = false; }
+        },
+
+        resetFormBook() {
+          this.formBook = {
+            isEditMode: false, Book_ID: '', Title_English: '', Title_Original: '',
+            Book_Type: 'Normal Book', Series_Name: '', Volume_Number: '', Authors: '',
+            Publisher: '', ISBN: '', Edition: '', Language: 'English',
+            Category_Genre: 'Fiction & Literature', Publish_Year: '', Pages: '',
+            Book_Format: 'Physical', Shelf_Location: 'Main Room - Shelf A - Row 1',
+            Date_Acquired: new Date().toISOString().substring(0, 10), Purchase_Price: '',
+            Reading_Status: 'Unread', Book_Condition: 'Good', Rating: '',
+            Notes_Remarks: '', Description_Blurb: '', Cover_Image_URL: '', Back_Image_URL: '',
+            Call_Number: 'ENG-FIC-AUT-ND', Call_Number_Mode: 'Auto',
+            frontCoverBase64: '', backCoverBase64: '', pdfBase64: '', pdfFileName: ''
+          };
+        },
+
+        // ===================================================================
+        // DIRECT QUICK CHECKOUT, LENDING & CUSTOM WHATSAPP SENDER
+        // ===================================================================
+        openBookDetail(book) { this.selectedBook = book; },
+
+        openQuickCheckoutModal(book) {
+          const avail = this.getAvailableCopies(book.Book_ID);
+          if (!avail.length) return;
+          this.quickCheckoutBook = book;
+          this.checkoutForm.Accession_Number = avail[0].Accession_Number;
+        },
+
         startDeskScanner(mode) {
-          if (this.deskScannerMode === mode) { this.stopScanner(); return; }
-          this.stopScanner();
+          if (this.deskScannerMode === mode) { this.stopAllScanners(); return; }
+          this.stopAllScanners();
           this.deskScannerMode = mode;
-          const targetDiv = mode === 'checkout' ? 'desk-scanner-checkout' : 'desk-scanner-checkin';
+          const divId = mode === 'checkout' ? 'desk-scanner-checkout' : 'desk-scanner-checkin';
           this.$nextTick(() => {
-            this.html5QrCode = new Html5Qrcode(targetDiv);
-            this.html5QrCode.start(
+            this.qrInstance = new Html5Qrcode(divId);
+            this.qrInstance.start(
               { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 220, height: 150 } },
-              (decodedText) => {
-                if (mode === 'checkout') this.checkoutForm.Copy_ID = decodedText.trim();
-                else this.checkinForm.Copy_ID = decodedText.trim();
-                this.stopScanner();
+              { fps: 10, qrbox: { width: 220, height: 140 } },
+              (decoded) => {
+                if (mode === 'checkout') this.checkoutForm.Accession_Number = decoded.trim();
+                else this.checkinForm.Accession_Number = decoded.trim();
+                this.stopAllScanners();
               },
               () => {}
-            ).catch(err => { alert('Camera error: ' + err); this.deskScannerMode = ''; });
+            ).catch(() => { this.deskScannerMode = ''; });
           });
         },
 
         async submitCheckout() {
-          if (!this.checkoutForm.Copy_ID || !this.checkoutForm.Member_ID) { alert('Select both Copy ID and Member.'); return; }
+          if (!this.checkoutForm.Accession_Number || !this.checkoutForm.Member_ID) {
+            alert('Please select both a Copy Accession Number and a Member.');
+            return;
+          }
           this.loading = true;
+          this.loadingText = 'ISSUING BOOK...';
           try {
             const res = await fetch(this.apiUrl, {
               method: 'POST',
@@ -1346,15 +1583,18 @@
             });
             const out = await res.json();
             if (out.status === 'ok') {
-              alert(`Checked out ${out.transaction.Copy_ID}! Due: ${out.transaction.Due_Date}`);
-              this.checkoutForm = { Copy_ID: '', Member_ID: '', Loan_Days: 14, Notes: '' };
               await this.loadSnapshot();
-            } else alert('Checkout blocked: ' + out.message);
+              if (out.memberPhone && confirm(`Book Issued! Send "Book Taken Update" on WhatsApp to ${out.transaction.Member_Name}?`)) {
+                this.selectedWaTemplateKey = 'Book_Taken_Update';
+                this.sendCustomWhatsApp(out.transaction);
+              }
+              this.checkoutForm = { Accession_Number: '', Member_ID: '', Loan_Days: 14, Notes: '' };
+            } else alert(out.message);
           } finally { this.loading = false; }
         },
 
         async submitCheckin() {
-          if (!this.checkinForm.Copy_ID) { alert('Select or scan a Copy ID to return.'); return; }
+          if (!this.checkinForm.Accession_Number) return;
           this.loading = true;
           try {
             const res = await fetch(this.apiUrl, {
@@ -1363,136 +1603,147 @@
             });
             const out = await res.json();
             if (out.status === 'ok') {
-              alert(`Returned successfully!`);
-              this.checkinForm = { Copy_ID: '', Return_Condition: 'Good', Notes: '' };
+              this.checkinForm = { Accession_Number: '', Return_Condition: 'Good', Notes: '' };
               await this.loadSnapshot();
             } else alert(out.message);
           } finally { this.loading = false; }
         },
 
-        async quickReturnFromTable(txn) {
-          const cond = prompt('Confirm Return Condition (New, Good, Worn, Damaged):', txn.Issue_Condition || 'Good');
-          if (!cond) return;
-          this.checkinForm = { Copy_ID: txn.Copy_ID, Return_Condition: cond, Notes: '' };
+        async quickReturn(txn) {
+          this.checkinForm = { Accession_Number: txn.Accession_Number, Return_Condition: txn.Issue_Condition || 'Good', Notes: '' };
           await this.submitCheckin();
         },
 
-        async renewActiveLoan(txn) {
-          this.loading = true;
-          try {
-            const res = await fetch(this.apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({ action: 'renewLoan', pin: this.adminPin, data: { Txn_ID: txn.Txn_ID, Extra_Days: 7 } })
-            });
-            const out = await res.json();
-            if (out.status === 'ok') await this.loadSnapshot();
-            else alert(out.message);
-          } finally { this.loading = false; }
-        },
-
-        async saveMember() {
-          if (!this.memberForm.Full_Name) { alert('Member Name is required.'); return; }
-          this.loading = true;
-          try {
-            const res = await fetch(this.apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({ action: 'addOrUpdateMember', pin: this.adminPin, data: this.memberForm })
-            });
-            const out = await res.json();
-            if (out.status === 'ok') {
-              this.memberForm = { Full_Name: '', Relationship: 'Friend', Phone_WhatsApp: '', Email: '', Max_Loan_Limit: 3 };
-              await this.loadSnapshot();
-            }
-          } finally { this.loading = false; }
-        },
-
-        async loadWhatsAppQueue() {
-          try {
-            const res = await fetch(`${this.apiUrl}?action=getWhatsAppQueue`);
-            const out = await res.json();
-            if (out.status === 'ok') this.whatsappQueue = out.reminders || [];
-          } catch (e) {}
-        },
-
-        async sendWhatsAppRedirect(item) {
-          if (!item.Phone_WhatsApp) { alert('No WhatsApp phone number saved for this member.'); return; }
-          let msg = item.Message_Preview;
-          if (this.waLang === 'ml') {
-            msg = `നമസ്കാരം ${item.Member_Name}, SKD ഹോം ലൈബ്രറിയിൽ നിന്നുള്ള ഓർമ്മപ്പെടുത്തൽ! നിങ്ങൾ എടുത്ത *"${item.Book_Title}"* (${item.Call_Number}) എന്ന പുസ്തകം തിരികെ നൽകേണ്ട തീയതി *${String(item.Due_Date).substring(0,10)}* ആണ്. കാലാവധി നീട്ടണമെങ്കിലോ തിരികെ നൽകാനോ ദയവായി അറിയിക്കുക. നന്ദി!`;
-          }
-          window.open(`https://wa.me/${item.Phone_WhatsApp}?text=${encodeURIComponent(msg)}`, '_blank');
-          await fetch(this.apiUrl, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'markReminderSent', pin: this.adminPin, txnId: item.Txn_ID })
-          });
-          await this.loadWhatsAppQueue();
-        },
-
-        formatStackedCallNo(callNo) { return String(callNo || 'UNCL').replace(/-/g, ' ').split(/\s+/).filter(Boolean); },
-        renderAllStickers() {
-          this.copies.forEach(copy => {
-            const el = document.getElementById('qr-' + copy.Copy_ID);
-            if (el) {
-              el.innerHTML = '';
-              new QRCode(el, { text: copy.Copy_ID, width: 56, height: 56, correctLevel: QRCode.CorrectLevel.M });
-            }
-          });
-        },
-
-        exportCatalogCSV() {
-          if (!this.catalog.length) return;
-          const headers = Object.keys(this.catalog[0]);
-          const csvRows = [headers.join(','), ...this.catalog.map(row => headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))];
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' }));
-          link.download = `SKD_Library_Backup_${new Date().toISOString().substring(0,10)}.csv`;
-          link.click();
-        },
-
-        async deleteBookRecord(bookId) {
-          if (!confirm('Are you sure you want to delete this book?')) return;
+        async renewLoan(txn) {
           this.loading = true;
           try {
             await fetch(this.apiUrl, {
               method: 'POST',
-              body: JSON.stringify({ action: 'deleteRecord', pin: this.adminPin, data: { table: '1_Catalog', pkColumn: 'Book_ID', id: bookId } })
+              body: JSON.stringify({ action: 'renewLoan', pin: this.adminPin, data: { Txn_ID: txn.Txn_ID, Extra_Days: 7 } })
             });
-            this.selectedBook = null;
             await this.loadSnapshot();
           } finally { this.loading = false; }
         },
 
-        async addAnotherCopy(book) {
-          const room = prompt('Enter Room for this copy:', 'Main Room');
-          if (!room) return;
-          const shelf = prompt('Enter Shelf:', 'Shelf A');
-          this.loading = true;
-          try {
-            const res = await fetch(this.apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({ action: 'addPhysicalCopy', pin: this.adminPin, data: { Book_ID: book.Book_ID, Base_Call_Number: book.Call_Number, Room: room, Shelf: shelf } })
-            });
-            const out = await res.json();
-            if (out.status === 'ok') {
-              alert(`Added copy: ${out.copy.Copy_ID} (${out.copy.Copy_Call_Number})`);
-              await this.loadSnapshot();
+        sendCustomWhatsApp(txn) {
+          const member = this.members.find(m => m.Member_ID === txn.Member_ID);
+          const phone = member ? String(member.Phone_WhatsApp || '').replace(/[^0-9]/g, '') : '';
+          if (!phone) { alert('No WhatsApp phone number saved for this member.'); return; }
+
+          const tplObj = this.whatsappTemplates.find(t => t.Config_Key === this.selectedWaTemplateKey) || this.whatsappTemplates[0];
+          let text = tplObj ? tplObj.Config_Value : 'Hi [Member_Name], reminder for "[Book_Title]" ([Accession_Number]) due on [Due_Date].';
+
+          text = text
+            .replace(/\[Member_Name\]/g, txn.Member_Name || '')
+            .replace(/\[Book_Title\]/g, txn.Book_Title || '')
+            .replace(/\[Accession_Number\]/g, txn.Accession_Number || '')
+            .replace(/\[Call_Number\]/g, txn.Call_Number || '')
+            .replace(/\[Issue_Date\]/g, String(txn.Issue_Date).substring(0, 10))
+            .replace(/\[Due_Date\]/g, String(txn.Due_Date).substring(0, 10));
+
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+        },
+
+        // ===================================================================
+        // MINIMALIST STICKERS, DIRECT PDF UPLOAD & CONFIG SAVERS
+        // ===================================================================
+        renderSmallStickers() {
+          this.copies.forEach(c => {
+            const el = document.getElementById('mini-qr-' + c.Accession_Number);
+            if (el) {
+              el.innerHTML = '';
+              new QRCode(el, { text: c.Accession_Number, width: 52, height: 52, correctLevel: QRCode.CorrectLevel.M });
             }
-          } finally { this.loading = false; }
+          });
+        },
+
+        async handleDirectArchivePdfUpload(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          const title = prompt('Enter Book Title for this Archive PDF:', file.name.replace(/\.pdf$/i, ''));
+          if (!title) return;
+
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            this.loading = true;
+            this.loadingText = 'UPLOADING PDF TO GOOGLE DRIVE ARCHIVE...';
+            try {
+              const res = await fetch(this.apiUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                  action: 'uploadArchivePdf',
+                  pin: this.adminPin,
+                  data: { Book_Title: title, fileName: file.name, base64Data: e.target.result }
+                })
+              });
+              const out = await res.json();
+              if (out.status === 'ok') await this.loadSnapshot();
+              else alert(out.message);
+            } finally { this.loading = false; }
+          };
+          reader.readAsDataURL(file);
         },
 
         async syncDriveFolder() {
           this.loading = true;
           try {
-            const res = await fetch(this.apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({ action: 'syncDriveArchive', pin: this.adminPin })
-            });
-            const out = await res.json();
-            if (out.status === 'ok') {
-              alert(`Synced! Newly linked files: ${out.newlyLinkedCount}`);
-              await this.loadSnapshot();
-            }
+            await fetch(this.apiUrl, { method: 'POST', body: JSON.stringify({ action: 'syncDriveArchive', pin: this.adminPin }) });
+            await this.loadSnapshot();
           } finally { this.loading = false; }
+        },
+
+        async addDuplicateCopy(book) {
+          const loc = prompt('Enter Shelf Location:', this.configList('Shelf_Location')[0]);
+          if (!loc) return;
+          this.loading = true;
+          try {
+            await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'addPhysicalCopy', pin: this.adminPin, data: { Book_ID: book.Book_ID, Shelf_Location: loc } })
+            });
+            await this.loadSnapshot();
+          } finally { this.loading = false; }
+        },
+
+        async saveTemplate(tpl) {
+          this.loading = true;
+          try {
+            await fetch(this.apiUrl, { method: 'POST', body: JSON.stringify({ action: 'saveSystemConfig', pin: this.adminPin, data: tpl }) });
+            alert('WhatsApp Template Updated!');
+          } finally { this.loading = false; }
+        },
+
+        async saveMember() {
+          if (!this.memberForm.Full_Name) return;
+          this.loading = true;
+          try {
+            await fetch(this.apiUrl, { method: 'POST', body: JSON.stringify({ action: 'saveMember', pin: this.adminPin, data: this.memberForm }) });
+            this.memberForm = { Full_Name: '', Phone_WhatsApp: '', Relationship: 'Friend' };
+            await this.loadSnapshot();
+          } finally { this.loading = false; }
+        },
+
+        isOverdue(dueStr) {
+          return dueStr && String(dueStr).substring(0, 10) < new Date().toISOString().substring(0, 10);
+        },
+
+        stopAllScanners() {
+          if (this.qrInstance) {
+            this.qrInstance.stop().then(() => {
+              this.qrInstance.clear();
+              this.homeScannerActive = false;
+              this.formScannerActive = false;
+              this.deskScannerMode = '';
+            }).catch(() => {
+              this.homeScannerActive = false;
+              this.formScannerActive = false;
+              this.deskScannerMode = '';
+            });
+          } else {
+            this.homeScannerActive = false;
+            this.formScannerActive = false;
+            this.deskScannerMode = '';
+          }
         }
       };
     }
