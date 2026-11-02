@@ -1,5 +1,5 @@
 # 📚 SKD Home Library & Digital Archive Management System
-
+(made with Gemini 4 Argon High)
 A full-featured, zero-cost **Home Library & Digital Preservation Archive Management System** built with **Google Sheets**, **Google Drive**, **Google Apps Script**, and an installable **Progressive Web App (PWA)** frontend hosted on **GitHub Pages**.
 
 Designed for personal, family, and community libraries, it supports **copy-level physical tracking**, **5-server ISBN barcode auto-fetching**, **Google Lens multilingual blurb extraction** (Malayalam, Arabic, English, Hindi), **hybrid Call Number generation**, **Google Drive PDF archive reading**, **1-tap WhatsApp reminders (`wa.me`)**, and **printable Spine + QR code sticker sheets**.
