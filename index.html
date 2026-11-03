@@ -29,6 +29,7 @@
   <!-- Barcode/QR Scanner & QR Generator -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 
   <style>
     [x-cloak] { display: none !important; }
@@ -2390,64 +2391,51 @@
         },
 
         // 👇 PASTE THE NEW FUNCTION RIGHT HERE 👇
-        async handleBlurbOcrUpload(event) {
-          const file = event.target.files[0];
-          if (!file) return;
-
-          // 1. Compress image (Must be under 1MB)
-          const compressImage = (file) => {
-            return new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.readAsDataURL(file);
-              reader.onload = (e) => {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = () => {
-                  const canvas = document.createElement('canvas');
-                  const MAX_WIDTH = 1000; 
-                  const scale = MAX_WIDTH / img.width;
-                  canvas.width = MAX_WIDTH;
-                  canvas.height = img.height * scale;
-                  const ctx = canvas.getContext('2d');
-                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality
-                };
-              };
-            });
-          };
-
-          const base64Data = await compressImage(file);
-
-          this.loading = true;
-          this.loadingText = 'Scanning text...';
-          
-          try {
-            const res = await fetch(this.apiUrl, {
-              method: 'POST',
-              body: JSON.stringify({
-                action: 'ocrBlurb',
-                pin: this.adminPin,
-                data: { imageBase64: base64Data }
-              })
-            });
-            
-            const out = await res.json();
-            
-            if (out.status === 'ok' && out.text) {
-              this.formBook.Description_Blurb = this.formBook.Description_Blurb 
-                ? this.formBook.Description_Blurb + '\n\n' + out.text 
-                : out.text;
-            } else {
-              alert('OCR Error: ' + (out.message || 'Could not read text.'));
+          async handleBlurbOcrUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+        
+            this.loading = true;
+            this.loadingText = 'Running offline OCR (this may take a moment)...';
+        
+            try {
+                // 1. Determine the language code based on the book's selected language
+                let langCode = 'eng'; // Default to English
+                const selectedLang = String(this.formBook.Language || '').toLowerCase();
+                
+                if (selectedLang.includes('malayalam') || selectedLang.includes('മലയാളം')) {
+                    langCode = 'mal';
+                } else if (selectedLang.includes('arabic') || selectedLang.includes('العربية')) {
+                    langCode = 'ara';
+                }
+        
+                // 2. Initialize the Tesseract worker with the required language
+                // 'eng+mal' means it will try to recognize both simultaneously, which is great for transliterated books
+                const worker = await Tesseract.createWorker(langCode);
+                
+                // 3. Recognize the text from the uploaded image file
+                const ret = await worker.recognize(file);
+                const extractedText = ret.data.text;
+        
+                if (extractedText && extractedText.trim() !== '') {
+                    // Append the extracted text to the Blurb field
+                    this.formBook.Description_Blurb = this.formBook.Description_Blurb 
+                        ? this.formBook.Description_Blurb + '\n\n' + extractedText 
+                        : extractedText;
+                } else {
+                    alert('Tesseract could not detect any text. Please ensure the photo is well-lit and in focus.');
+                }
+                
+                await worker.terminate();
+        
+            } catch (error) {
+                console.error("Tesseract OCR Error:", error);
+                alert('Offline OCR failed. See the browser console for details.');
+            } finally {
+                this.loading = false;
+                event.target.value = ''; // Reset the file input
             }
-          } catch (err) {
-            console.error(err);
-            alert('Failed to connect to OCR service.');
-          } finally {
-            this.loading = false;
-            event.target.value = '';
-          }
-        },
+        },  
         // 👆 END OF NEW FUNCTION 👆
 
         async runAiPipeline() {
