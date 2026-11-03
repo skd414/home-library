@@ -1074,20 +1074,23 @@
               <input type="text" x-model="formBook.Notes_Remarks" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2" />
             </div>
 
-            <div class="md:col-span-4">
-              <!-- Added a flex container to put a button next to the label -->
-              <div class="flex justify-between items-center mb-1">
-                <label class="block font-semibold text-slate-600">Blurb / Description</label>
+          <div class="md:col-span-4">
+            <div class="flex justify-between items-center mb-1">
+              <label class="block font-semibold text-slate-600">Blurb / Description</label>
+              
+              <!-- 🆕 PROGRESS INDICATOR ADDED HERE -->
+              <div class="flex items-center gap-2">
+                <span x-show="ocrProgress" x-cloak class="text-[10px] font-bold text-blue-600 animate-pulse" x-text="ocrProgress"></span>
+                
                 <label class="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
                   📷 Scan Text (OCR)
-                  <input type="file" accept="image/*" capture="environment" @change="($event)" class="hidden" />
+                  <input type="file" accept="image/*" capture="environment" @change="handleBlurbOcrUpload($event)" class="hidden" />
                 </label>
               </div>
-              <textarea x-model="formBook.Description_Blurb" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3"></textarea>
             </div>
+            <textarea x-model="formBook.Description_Blurb" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3"></textarea>
           </div>
-        </div>
-
+          
         <div class="flex justify-between items-center pt-4 border-t border-slate-100">
           <div>
             <button x-show="formBook.isEditMode" type="button" @click="deleteBook(formBook.Book_ID)"
@@ -2391,51 +2394,93 @@
         },
 
         // 👇 PASTE THE NEW FUNCTION RIGHT HERE 👇
-          async handleBlurbOcrUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-        
-            this.loading = true;
-            this.loadingText = 'Running offline OCR (this may take a moment)...';
-        
-            try {
-                // 1. Determine the language code based on the book's selected language
-                let langCode = 'eng'; // Default to English
-                const selectedLang = String(this.formBook.Language || '').toLowerCase();
-                
-                if (selectedLang.includes('malayalam') || selectedLang.includes('മലയാളം')) {
-                    langCode = 'mal';
-                } else if (selectedLang.includes('arabic') || selectedLang.includes('العربية')) {
-                    langCode = 'ara';
-                }
-        
-                // 2. Initialize the Tesseract worker with the required language
-                // 'eng+mal' means it will try to recognize both simultaneously, which is great for transliterated books
-                const worker = await Tesseract.createWorker(langCode);
-                
-                // 3. Recognize the text from the uploaded image file
-                const ret = await worker.recognize(file);
-                const extractedText = ret.data.text;
-        
-                if (extractedText && extractedText.trim() !== '') {
-                    // Append the extracted text to the Blurb field
-                    this.formBook.Description_Blurb = this.formBook.Description_Blurb 
-                        ? this.formBook.Description_Blurb + '\n\n' + extractedText 
-                        : extractedText;
-                } else {
-                    alert('Tesseract could not detect any text. Please ensure the photo is well-lit and in focus.');
-                }
-                
-                await worker.terminate();
-        
-            } catch (error) {
-                console.error("Tesseract OCR Error:", error);
-                alert('Offline OCR failed. See the browser console for details.');
-            } finally {
-                this.loading = false;
-                event.target.value = ''; // Reset the file input
+        async handleBlurbOcrUpload(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          this.loading = true;
+          this.ocrProgress = 'Initializing...';
+
+          // 1. Compress image to speed up Tesseract
+          const compressImage = (file) => {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.readAsDataURL(file);
+              reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  const MAX_WIDTH = 1200; // Tesseract likes ~1200px for reading text
+                  const scale = MAX_WIDTH / img.width;
+                  canvas.width = MAX_WIDTH;
+                  canvas.height = img.height * scale;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  resolve(canvas.toDataURL('image/jpeg', 0.85));
+                };
+              };
+            });
+          };
+
+          const compressedBase64 = await compressImage(file);
+
+          try {
+            // 2. Determine language
+            let langCode = 'eng'; 
+            const selectedLang = String(this.formBook.Language || '').toLowerCase();
+            
+            if (selectedLang.includes('malayalam') || selectedLang.includes('മലയാളം')) {
+                langCode = 'mal'; // Malayalam
+            } else if (selectedLang.includes('arabic') || selectedLang.includes('العربية')) {
+                langCode = 'ara'; // Arabic
+            } else if (selectedLang.includes('hindi') || selectedLang.includes('हिन्दी')) {
+                langCode = 'hin'; // Hindi
             }
-        },  
+
+            this.ocrProgress = 'Loading language data...';
+
+            // 3. Initialize Tesseract with a Logger for live progress
+            const worker = await Tesseract.createWorker(langCode, 1, {
+              logger: m => {
+                if (m.status === 'recognizing text') {
+                  this.ocrProgress = `Reading: ${Math.round(m.progress * 100)}%`;
+                } else if (m.status === 'loading language traineddata') {
+                  this.ocrProgress = `Downloading language: ${Math.round(m.progress * 100)}%`;
+                } else {
+                  this.ocrProgress = m.status;
+                }
+              }
+            });
+            
+            // 4. Recognize the text
+            const ret = await worker.recognize(compressedBase64);
+            const extractedText = ret.data.text;
+
+            if (extractedText && extractedText.trim().length > 2) {
+              this.formBook.Description_Blurb = this.formBook.Description_Blurb 
+                  ? this.formBook.Description_Blurb + '\n\n' + extractedText 
+                  : extractedText;
+              this.ocrProgress = 'Done! ✅';
+            } else {
+              alert('Tesseract could not detect any text. Please ensure the photo is well-lit and in focus.');
+              this.ocrProgress = 'Failed. ❌';
+            }
+            
+            await worker.terminate();
+
+          } catch (error) {
+            console.error("Tesseract OCR Error:", error);
+            alert('Offline OCR failed. Are you connected to the internet? (The first run needs to download language files).');
+            this.ocrProgress = 'Error. ❌';
+          } finally {
+            this.loading = false;
+            event.target.value = ''; 
+            
+            // Clear the progress text after 3 seconds
+            setTimeout(() => { this.ocrProgress = ''; }, 3000);
+          }
+        },
         // 👆 END OF NEW FUNCTION 👆
 
         async runAiPipeline() {
