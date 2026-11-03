@@ -1074,7 +1074,14 @@
             </div>
 
             <div class="md:col-span-4">
-              <label class="block font-semibold text-slate-600 mb-1">Blurb / Description</label>
+              <!-- Added a flex container to put a button next to the label -->
+              <div class="flex justify-between items-center mb-1">
+                <label class="block font-semibold text-slate-600">Blurb / Description</label>
+                <label class="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                  📷 Scan Text (OCR)
+                  <input type="file" accept="image/*" capture="environment" @change="handleBlurbOcrUpload($event)" class="hidden" />
+                </label>
+              </div>
               <textarea x-model="formBook.Description_Blurb" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3"></textarea>
             </div>
           </div>
@@ -2381,6 +2388,51 @@
           reader.onload = (e) => { this.formBook.pdfBase64 = e.target.result; };
           reader.readAsDataURL(file);
         },
+
+        // 👇 PASTE THE NEW FUNCTION RIGHT HERE 👇
+        async handleBlurbOcrUpload(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          // Convert image to base64
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const base64Data = e.target.result;
+            
+            this.loading = true;
+            this.loadingText = 'Scanning text with OCR.space (Engine 3)...';
+            
+            try {
+              const res = await fetch(this.apiUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                  action: 'ocrBlurb',
+                  pin: this.adminPin,
+                  data: { imageBase64: base64Data }
+                })
+              });
+              
+              const out = await res.json();
+              
+              if (out.status === 'ok' && out.text) {
+                // Append extracted text to the current blurb
+                this.formBook.Description_Blurb = this.formBook.Description_Blurb 
+                  ? this.formBook.Description_Blurb + '\n\n' + out.text 
+                  : out.text;
+              } else {
+                alert('OCR Error: ' + (out.message || 'Could not read text.'));
+              }
+            } catch (err) {
+              console.error(err);
+              alert('Failed to connect to OCR service.');
+            } finally {
+              this.loading = false;
+              event.target.value = ''; // Reset input so they can scan again if needed
+            }
+          };
+          reader.readAsDataURL(file);
+        },
+        // 👆 END OF NEW FUNCTION 👆
 
         async runAiPipeline() {
           const imgs = [];
