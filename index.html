@@ -877,6 +877,21 @@
               <input type="file" accept="image/*" capture="environment" @change="handleCoverUpload($event, 'back')" class="hidden" />
             </label>
           </div>
+          
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Publisher Details Page</label>
+            <label class="cursor-pointer block bg-white border border-slate-200 rounded-xl text-center py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              <!-- Using a ternary operator to check if the image exists -->
+              <span x-text="formBook.publisherCoverBase64 || formBook.Publisher_Cover_Image_URL ? '✅ Publisher Page Set' : '📷 Snap Publisher Page'"></span>
+              <input 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                @change="handleCoverUpload($event, 'publisher')" 
+                class="hidden" 
+              />
+            </label>
+          </div>
 
           <div class="flex items-end">
             <button type="button" @click="runAiPipeline()" :disabled="loading"
