@@ -1079,7 +1079,7 @@
                 <label class="block font-semibold text-slate-600">Blurb / Description</label>
                 <label class="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
                   📷 Scan Text (OCR)
-                  <input type="file" accept="image/*" capture="environment" @change="handleBlurbOcrUpload($event)" class="hidden" />
+                  <input type="file" accept="image/*" capture="environment" @change="($event)" class="hidden" />
                 </label>
               </div>
               <textarea x-model="formBook.Description_Blurb" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3"></textarea>
@@ -2390,11 +2390,11 @@
         },
 
         // 👇 PASTE THE NEW FUNCTION RIGHT HERE 👇
-                async handleBlurbOcrUpload(event) {
+        async handleBlurbOcrUpload(event) {
           const file = event.target.files[0];
           if (!file) return;
 
-          // 1. Aggressive Compression to stay under the 1MB limit
+          // 1. Compress image (Must be under 1MB)
           const compressImage = (file) => {
             return new Promise((resolve) => {
               const reader = new FileReader();
@@ -2404,15 +2404,13 @@
                 img.src = e.target.result;
                 img.onload = () => {
                   const canvas = document.createElement('canvas');
-                  const MAX_WIDTH = 1000; // Compress to 1000px wide
+                  const MAX_WIDTH = 1000; 
                   const scale = MAX_WIDTH / img.width;
                   canvas.width = MAX_WIDTH;
                   canvas.height = img.height * scale;
                   const ctx = canvas.getContext('2d');
                   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  
-                  // Compress to JPEG at 70% quality (usually yields ~200KB-400KB)
-                  resolve(canvas.toDataURL('image/jpeg', 0.7));
+                  resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality
                 };
               };
             });
@@ -2440,7 +2438,6 @@
                 ? this.formBook.Description_Blurb + '\n\n' + out.text 
                 : out.text;
             } else {
-              // This will now show the EXACT error from the API (e.g. File too large)
               alert('OCR Error: ' + (out.message || 'Could not read text.'));
             }
           } catch (err) {
