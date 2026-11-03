@@ -2390,47 +2390,66 @@
         },
 
         // 👇 PASTE THE NEW FUNCTION RIGHT HERE 👇
-        async handleBlurbOcrUpload(event) {
+                async handleBlurbOcrUpload(event) {
           const file = event.target.files[0];
           if (!file) return;
 
-          // Convert image to base64
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const base64Data = e.target.result;
-            
-            this.loading = true;
-            this.loadingText = 'Scanning text with OCR.space (Engine 3)...';
-            
-            try {
-              const res = await fetch(this.apiUrl, {
-                method: 'POST',
-                body: JSON.stringify({
-                  action: 'ocrBlurb',
-                  pin: this.adminPin,
-                  data: { imageBase64: base64Data }
-                })
-              });
-              
-              const out = await res.json();
-              
-              if (out.status === 'ok' && out.text) {
-                // Append extracted text to the current blurb
-                this.formBook.Description_Blurb = this.formBook.Description_Blurb 
-                  ? this.formBook.Description_Blurb + '\n\n' + out.text 
-                  : out.text;
-              } else {
-                alert('OCR Error: ' + (out.message || 'Could not read text.'));
-              }
-            } catch (err) {
-              console.error(err);
-              alert('Failed to connect to OCR service.');
-            } finally {
-              this.loading = false;
-              event.target.value = ''; // Reset input so they can scan again if needed
-            }
+          // 1. Aggressive Compression to stay under the 1MB limit
+          const compressImage = (file) => {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.readAsDataURL(file);
+              reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  const MAX_WIDTH = 1000; // Compress to 1000px wide
+                  const scale = MAX_WIDTH / img.width;
+                  canvas.width = MAX_WIDTH;
+                  canvas.height = img.height * scale;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  
+                  // Compress to JPEG at 70% quality (usually yields ~200KB-400KB)
+                  resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+              };
+            });
           };
-          reader.readAsDataURL(file);
+
+          const base64Data = await compressImage(file);
+
+          this.loading = true;
+          this.loadingText = 'Scanning text...';
+          
+          try {
+            const res = await fetch(this.apiUrl, {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'ocrBlurb',
+                pin: this.adminPin,
+                data: { imageBase64: base64Data }
+              })
+            });
+            
+            const out = await res.json();
+            
+            if (out.status === 'ok' && out.text) {
+              this.formBook.Description_Blurb = this.formBook.Description_Blurb 
+                ? this.formBook.Description_Blurb + '\n\n' + out.text 
+                : out.text;
+            } else {
+              // This will now show the EXACT error from the API (e.g. File too large)
+              alert('OCR Error: ' + (out.message || 'Could not read text.'));
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Failed to connect to OCR service.');
+          } finally {
+            this.loading = false;
+            event.target.value = '';
+          }
         },
         // 👆 END OF NEW FUNCTION 👆
 
